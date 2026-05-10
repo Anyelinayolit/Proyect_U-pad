@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "260484998013",
+    "project_id": "u-pad-1f4a7",
+    "storage_bucket": "u-pad-1f4a7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:260484998013:android:5bd4ddb407df7116562214",
+        "android_client_info": {
+          "package_name": "com.example.upad"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZdbLjp9sr7BNpuqLtKMKbvxsyh8wM2-c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
