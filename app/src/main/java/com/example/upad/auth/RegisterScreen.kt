@@ -1,137 +1,145 @@
 package com.example.upad.auth
 
-import android.widget.Toast
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import android.util.Log
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.upad.data.FirebaseRepository
-import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.launch
 
 @Composable
 fun RegisterScreen(
-    onRegisterComplete: (String, String) -> Unit
+    onRegisterComplete: (String, String) -> Unit,
+    onBackClick: () -> Unit
 ) {
-    var step by remember { mutableStateOf(1) }
+    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    // Herramientas necesarias para Firebase y alertas
-    val context = LocalContext.current
-    val auth = FirebaseAuth.getInstance()
-    val scope = rememberCoroutineScope()
-    val repository = remember { FirebaseRepository() }
+    val colorAzulTEA = Color(0xFF4FC3F7)
+    val colorFondoBase = Color(0xFFF0F4F8)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .background(colorFondoBase)
     ) {
-        if (step == 1) {
+        // --- CABECERA CURVA ---
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(bottomStart = 45.dp, bottomEnd = 45.dp))
+                .background(Color.White)
+                .padding(start = 24.dp, top = 40.dp, end = 24.dp, bottom = 32.dp)
+        ) {
+            IconButton(onClick = onBackClick) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = colorAzulTEA)
+            }
             Text(
-                text = "¿Cuál es tu correo electrónico?",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Start)
+                text = "NUEVA CUENTA",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.LightGray,
+                modifier = Modifier.padding(start = 12.dp)
+            )
+            Text(
+                text = "Únete a U-Pad",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Black,
+                color = colorAzulTEA,
+                modifier = Modifier.padding(horizontal = 12.dp)
+            )
+        }
+
+        // --- FORMULARIO ---
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 32.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Campo Nombre
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nombre completo") },
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = colorAzulTEA) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = colorAzulTEA,
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White
+                ),
+                singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
+            // Campo Email
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text("EMAIL") },
+                label = { Text("Correo electrónico") },
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = colorAzulTEA) },
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = colorAzulTEA,
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White
+                ),
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
-                onClick = { if (email.isNotBlank()) step = 2 },
-                modifier = Modifier.align(Alignment.End)
-            ) {
-                Text("Siguiente")
-            }
-        } else {
-            Text(
-                text = "Crea una contraseña",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Start)
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
+            // Campo Password
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("CONTRASEÑA") },
+                label = { Text("Contraseña") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = colorAzulTEA) },
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = PasswordVisualTransformation(),
+                shape = RoundedCornerShape(20.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = colorAzulTEA,
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White
+                ),
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(40.dp))
 
+            // Botón Registro
             Button(
-                onClick = {
-                    Log.d("UPAD_DEBUG", "Botón Hecho presionado")
-                    if (email.isNotBlank() && password.isNotBlank()) {
-                        auth.createUserWithEmailAndPassword(email, password)
-                            .addOnCompleteListener { task ->
-                                if (task.isSuccessful) {
-                                    Log.d("UPAD_DEBUG", "Usuario creado en Auth")
-                                    val userId = task.result?.user?.uid
-                                    if (userId != null) {
-                                        scope.launch {
-                                            try {
-                                                val defaultName = email.substringBefore("@")
-                                                repository.saveUserData(userId, defaultName)
-                                                Log.d("UPAD_DEBUG", "Datos guardados en DB, navegando...")
-                                                onRegisterComplete(email, password)
-                                            } catch (e: Exception) {
-                                                Log.e("UPAD_DEBUG", "Error en DB: ${e.message}")
-                                                // Aun si falla la DB, navegamos para no trabar al usuario
-                                                onRegisterComplete(email, password)
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    Log.e("UPAD_DEBUG", "Error Auth: ${task.exception?.message}")
-                                    Toast.makeText(context, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                    } else {
-                        Log.w("UPAD_DEBUG", "Email o Password vacíos")
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
+                onClick = { onRegisterComplete(email, password) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(65.dp),
+                shape = RoundedCornerShape(22.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = colorAzulTEA),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
-                Text("Hecho")
+                Text(
+                    text = "CREAR CUENTA",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Black
+                )
             }
         }
     }

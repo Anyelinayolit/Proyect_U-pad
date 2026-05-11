@@ -1,22 +1,14 @@
 package com.example.upad.child
 
-import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -28,45 +20,121 @@ fun TaskFeedbackScreen(
     activityName: String = "Bañarse",
     onFeedbackSelected: (String) -> Unit
 ) {
+    val colorAzulTEA = Color(0xFF4FC3F7)
+    val colorFondoBase = Color(0xFFF0F4F8)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .background(colorFondoBase)
     ) {
-        Text(
-            text = "¿Cómo te sientes realizando la actividad \"$activityName\"?",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+        // --- CABECERA (Igual que las otras pantallas) ---
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp))
+                .background(Color.White)
+                .padding(top = 60.dp, bottom = 30.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            FeedbackFace(color = Color.Green, label = "Feliz") { onFeedbackSelected("feliz") }
-            FeedbackFace(color = Color.Yellow, label = "Neutral") { onFeedbackSelected("neutral") }
+            Text(
+                text = "¿CÓMO TE SIENTES?",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black,
+                color = colorAzulTEA,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Sobre la actividad: $activityName",
+                fontSize = 18.sp,
+                color = Color.Gray,
+                textAlign = TextAlign.Center
+            )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        // --- CONTENEDOR DE EMOCIONES ---
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Fila para Feliz y Neutral
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                FeedbackCard(
+                    modifier = Modifier.weight(1f),
+                    emoji = "😊",
+                    label = "FELIZ",
+                    color = Color(0xFF81C784), // Verde
+                    onClick = { onFeedbackSelected("feliz") }
+                )
+                FeedbackCard(
+                    modifier = Modifier.weight(1f),
+                    emoji = "😐",
+                    label = "NEUTRAL",
+                    color = Color(0xFFFFD54F), // Amarillo
+                    onClick = { onFeedbackSelected("neutral") }
+                )
+            }
 
-        FeedbackFace(color = Color.Red, label = "Triste") { onFeedbackSelected("triste") }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Fila para Triste (Ocupa el ancho completo para equilibrio visual)
+            FeedbackCard(
+                modifier = Modifier.fillMaxWidth(0.6f),
+                emoji = "🙁",
+                label = "TRISTE",
+                color = Color(0xFFE57373), // Rojo suave
+                onClick = { onFeedbackSelected("triste") }
+            )
+        }
+
+        // --- ESPACIADOR INFERIOR PARA MANTENER EL ESTILO ---
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
+                .background(Color.White)
+        )
     }
 }
 
 @Composable
-fun FeedbackFace(color: Color, label: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(100.dp)
-            .border(4.dp, color, CircleShape)
+fun FeedbackCard(
+    modifier: Modifier = Modifier,
+    emoji: String,
+    label: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .height(160.dp)
             .clickable { onClick() },
-        contentAlignment = Alignment.Center
+        shape = RoundedCornerShape(32.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Text(text = label, color = color, fontWeight = FontWeight.Bold)
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(text = emoji, fontSize = 50.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = label,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Black,
+                color = color
+            )
+        }
     }
 }

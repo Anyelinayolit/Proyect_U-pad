@@ -1,25 +1,19 @@
 package com.example.upad.auth
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.MarkEmailRead
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -30,61 +24,135 @@ fun ForgotPasswordScreen(
     var email by remember { mutableStateOf("") }
     var showDialog by remember { mutableStateOf(false) }
 
+    val colorAzulTEA = Color(0xFF4FC3F7)
+    val colorFondoBase = Color(0xFFF0F4F8)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .background(colorFondoBase)
     ) {
-        Text(
-            text = "¿Has olvidado la contraseña?",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "Enviaremos un enlace de restablecimiento de contraseña a tu dirección de correo electrónico registrada.",
-            fontSize = 14.sp,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("EMAIL") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(
-            onClick = { showDialog = true },
-            modifier = Modifier.fillMaxWidth()
+        // --- CABECERA CURVA U-PAD ---
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(bottomStart = 45.dp, bottomEnd = 45.dp))
+                .background(Color.White)
+                .padding(start = 24.dp, top = 40.dp, end = 24.dp, bottom = 32.dp)
         ) {
-            Text("Enviar enlace")
+            IconButton(onClick = onBackToLogin) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = colorAzulTEA)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "RECUPERACIÓN",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.LightGray,
+                modifier = Modifier.padding(start = 12.dp)
+            )
+            Text(
+                text = "¿Olvidaste tu contraseña?",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Black,
+                color = colorAzulTEA,
+                modifier = Modifier.padding(horizontal = 12.dp),
+                lineHeight = 32.sp
+            )
+        }
+
+        // --- CUERPO ---
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "No te preocupes, dinos tu correo y te enviaremos un enlace para que crees una nueva.",
+                fontSize = 15.sp,
+                color = Color.Gray,
+                textAlign = TextAlign.Center,
+                lineHeight = 22.sp
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // Campo Email Estilizado
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Tu correo electrónico") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = colorAzulTEA,
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White
+                ),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // Botón Enviar
+            Button(
+                onClick = { showDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(65.dp),
+                shape = RoundedCornerShape(22.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = colorAzulTEA),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+            ) {
+                Text(
+                    text = "ENVIAR ENLACE",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
         }
     }
 
+    // --- DIÁLOGO DE ÉXITO ESTILIZADO ---
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text("Revisa tu correo") },
-            text = { Text("Enviamos un enlace de recuperación para restablecer la contraseña.") },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = Color.White,
+            icon = {
+                Icon(
+                    Icons.Default.MarkEmailRead,
+                    contentDescription = null,
+                    tint = colorAzulTEA,
+                    modifier = Modifier.size(40.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "¡Revisa tu correo!",
+                    fontWeight = FontWeight.Black,
+                    color = colorAzulTEA
+                )
+            },
+            text = {
+                Text(
+                    text = "Te enviamos las instrucciones para recuperar tu acceso. ¡Casi listo!",
+                    textAlign = TextAlign.Center,
+                    color = Color.DarkGray
+                )
+            },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         showDialog = false
                         onBackToLogin()
-                    }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = colorAzulTEA)
                 ) {
-                    Text("OK")
+                    Text("ENTENDIDO", fontWeight = FontWeight.Bold)
                 }
             }
         )
