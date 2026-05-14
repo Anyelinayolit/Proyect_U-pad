@@ -10,7 +10,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,25 +21,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage // <--- Asegúrate de tener esta importación
+import com.example.upad.viewmodel.RoutineViewModel
 
 @Composable
 fun PictogramSelectionScreen(
+    viewModel: RoutineViewModel, // <--- Pasamos el ViewModel
     onBackClick: () -> Unit,
-    onPictogramSelected: (String) -> Unit
+    onPictogramSelected: (String, String) -> Unit // Ahora devuelve Nombre y URL
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    // Escuchamos los resultados de la API que llegan al ViewModel
+    val apiResults by viewModel.searchResults.collectAsState()
+
     val colorAzulTEA = Color(0xFF4FC3F7)
     val colorFondoBase = Color(0xFFF0F4F8)
 
-    // LISTA EXPANDIDA DE PICTOGRAMAS
-    val mockPictograms = listOf(
-        "LAVARSE LOS DIENTES", "IR AL BAÑO", "DUCHARSE", "PEINARSE",
-        "DESAYUNAR", "ALMORZAR", "CENAR", "TOMAR AGUA",
-        "VESTIRSE", "PONERSE ZAPATOS", "GUARDAR ROPA",
-        "IR AL COLEGIO", "HACER TAREA", "LEER", "TERAPIA",
-        "JUGAR SOLO", "COMPARTIR JUGUETES", "VER TV", "TABLET",
-        "DORMIR", "ORDENAR CUARTO", "PASEO EN PARQUE"
-    ).filter { it.contains(searchQuery.uppercase()) } // Filtro funcional básico
+    // Lanzar la búsqueda cada vez que cambia el texto (mínimo 3 letras)
+    LaunchedEffect(searchQuery) {
+        viewModel.searchArasaac(searchQuery)
+    }
 
     Column(
         modifier = Modifier
@@ -59,14 +59,14 @@ fun PictogramSelectionScreen(
                 Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = colorAzulTEA)
             }
             Text(
-                text = "BIBLIOTECA DE APOYO",
+                text = "BIBLIOTECA ARASAAC",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Black,
                 color = Color.LightGray,
                 modifier = Modifier.padding(start = 12.dp)
             )
             Text(
-                text = "Selecciona un Paso",
+                text = "Busca un Pictograma",
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Black,
                 color = colorAzulTEA,
@@ -81,12 +81,12 @@ fun PictogramSelectionScreen(
         ) {
             Spacer(modifier = Modifier.height(20.dp))
 
-            // BUSCADOR FUNCIONAL
+            // BUSCADOR REAL
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Ej: Baño, Almuerzo...", color = Color.Gray) },
+                placeholder = { Text("Ej: Lavarse las manos...", color = Color.Gray) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = colorAzulTEA) },
                 shape = RoundedCornerShape(20.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -100,7 +100,7 @@ fun PictogramSelectionScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // GRILLA
+            // GRILLA DE RESULTADOS REALES
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(bottom = 20.dp),
@@ -108,24 +108,28 @@ fun PictogramSelectionScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                items(mockPictograms) { title ->
+                items(apiResults) { pictogram ->
+                    val name = pictogram.keywords.firstOrNull()?.keyword?.uppercase() ?: "SIN NOMBRE"
+                    val imageUrl = "https://api.arasaac.org/api/pictograms/${pictogram._id}"
+
                     PictogramCard(
-                        title = title,
-                        onClick = { onPictogramSelected(title) }
+                        title = name,
+                        imageUrl = imageUrl,
+                        onClick = { onPictogramSelected(name, imageUrl) }
                     )
                 }
             }
 
-            // BOTÓN DE CARGA
+            // BOTÓN DE CARGA (OPCIONAL)
             Button(
-                onClick = { /* Lógica Firebase */ },
+                onClick = { /* Lógica propia */ },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp)
                     .height(60.dp),
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                elevation = ButtonDefaults.buttonElevation(2.dp)
             ) {
                 Icon(Icons.Default.CloudUpload, contentDescription = null, tint = colorAzulTEA)
                 Spacer(modifier = Modifier.width(12.dp))
@@ -136,13 +140,13 @@ fun PictogramSelectionScreen(
 }
 
 @Composable
-fun PictogramCard(title: String, onClick: () -> Unit) {
+fun PictogramCard(title: String, imageUrl: String, onClick: () -> Unit) {
     val colorAzulTEA = Color(0xFF4FC3F7)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.9f) // Mantiene las tarjetas proporcionales
+            .aspectRatio(0.9f)
             .clickable { onClick() },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -161,72 +165,22 @@ fun PictogramCard(title: String, onClick: () -> Unit) {
                     .background(Color(0xFFF8F9FA)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Image,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = colorAzulTEA.copy(alpha = 0.3f)
+                // AQUÍ SE CARGA LA IMAGEN DE ARASAAC
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = title,
+                    modifier = Modifier.fillMaxSize().padding(8.dp)
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = title,
                 fontWeight = FontWeight.Black,
-                fontSize = 11.sp, // Un poco más pequeño para que quepan textos largos
+                fontSize = 11.sp,
                 color = Color.DarkGray,
-                lineHeight = 13.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center,
+                maxLines = 2
             )
         }
-    }
-    @Composable
-    fun SendingRoutineDialog(
-        routineTurn: String,
-        childName: String,
-        onDismiss: () -> Unit
-    ) {
-        val colorAzulTEA = Color(0xFF4FC3F7)
-
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            confirmButton = {}, // No necesitamos botones, se cierra al terminar
-            shape = RoundedCornerShape(28.dp),
-            containerColor = Color.White,
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    // Indicador de carga estilizado
-                    CircularProgressIndicator(
-                        color = colorAzulTEA,
-                        strokeWidth = 5.dp,
-                        modifier = Modifier.size(60.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Text(
-                        text = "Enviando rutina de\n$routineTurn a $childName...",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.DarkGray,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 24.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Casi listo",
-                        fontSize = 14.sp,
-                        color = Color.Gray
-                    )
-                }
-            }
-        )
     }
 }

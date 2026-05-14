@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.upad.viewmodel.TaskItem
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,7 +29,7 @@ fun CreateRoutineScreen(
     routineTurn: String = "Mañana",
     childName: String = "Mateo",
     // Agregamos la lista como parámetro para que persista al volver de la otra pantalla
-    pasosSeleccionados: List<String> = emptyList(),
+    pasosSeleccionados: List<TaskItem> = emptyList(),
     onBackClick: () -> Unit,
     onNavigateToPictogramSearch: () -> Unit,
     onSendRoutine: () -> Unit,
@@ -234,7 +235,7 @@ fun SendingRoutineDialog(
 }
 
 @Composable
-fun PasoItemCard(nombre: String) {
+fun PasoItemCard(tarea: TaskItem) { // Recibe el objeto tarea
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -252,11 +253,20 @@ fun PasoItemCard(nombre: String) {
                     .background(Color(0xFFF0F4F8)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Image, contentDescription = null, tint = Color.LightGray)
+                // SI TIENE URL, MUESTRA LA IMAGEN DE ARASAAC
+                if (tarea.imageUrl.isNotEmpty()) {
+                    coil.compose.AsyncImage(
+                        model = tarea.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(Icons.Default.Image, contentDescription = null, tint = Color.LightGray)
+                }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Text(
-                text = nombre,
+                text = tarea.description, // Muestra el nombre
                 fontWeight = FontWeight.Bold,
                 color = Color.DarkGray,
                 modifier = Modifier.weight(1f)

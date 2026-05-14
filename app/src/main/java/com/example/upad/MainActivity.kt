@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -24,6 +25,7 @@ import com.example.upad.dashboard.AchievementReportScreen
 import com.example.upad.dashboard.ActivityDetailsScreen
 import com.example.upad.dashboard.NotificationsScreen
 import com.example.upad.dashboard.RoutineDashboardScreen
+import com.example.upad.data.FirebaseRepository
 import com.example.upad.routines.CreateRoutineScreen
 import com.example.upad.routines.PictogramSelectionScreen
 import com.example.upad.setup.ChildProfileSetupScreen
@@ -32,6 +34,9 @@ import com.example.upad.setup.ExperienceSetupScreen
 import com.example.upad.setup.SubscriptionPlansScreen
 import com.example.upad.setup.TrialDisclaimerScreen
 import com.example.upad.setup.TutorialsScreen
+
+import com.example.upad.viewmodel.RoutineViewModel
+import com.example.upad.viewmodel.RoutineViewModelFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,14 +51,22 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun UPadNavigation() {
     val navController = rememberNavController()
-    // La lista debe estar aquí para que todas las rutas la vean
-    val pasosSeleccionados = remember { mutableStateListOf<String>() }
+
+    // 1. Inicializamos el Repositorio y el ViewModel
+    // Nota: Si no tienes una Factory, puedes instanciarlo simple por ahora:
+    val repository = remember { FirebaseRepository() }
+    val routineViewModel: RoutineViewModel = viewModel(
+        factory = com.example.upad.viewmodel.RoutineViewModelFactory(repository)
+    )
+
+    // Observamos las tareas para pasarlas a la pantalla de creación
+    val tareasPorEnviar by routineViewModel.tasks.collectAsState()
 
     NavHost(
         navController = navController,
         startDestination = "role_selection"
     ) {
-        // --- SECCIÓN AUTENTICACIÓN Y ROLES ---
+        // --- SECCIÓN AUTENTICACIÓN Y ROLES (Sin cambios) ---
         composable("role_selection") {
             RoleSelectionScreen(
                 onRoleSelected = { role ->
@@ -140,7 +153,10 @@ fun UPadNavigation() {
         composable("parent_dashboard") {
             RoutineDashboardScreen(
                 onNavigateToCreateRoutine = { navController.navigate("create_routine/Nuevo") },
-                onRoutineClick = { routineName -> navController.navigate("create_routine/$routineName") }
+                onRoutineClick = { routineName ->
+                    routineViewModel.updateName(routineName)
+                    navController.navigate("create_routine/$routineName")
+                }
             )
         }
 
@@ -149,14 +165,19 @@ fun UPadNavigation() {
             arguments = listOf(navArgument("routineTurn") { type = NavType.StringType })
         ) { backStackEntry ->
             val turn = backStackEntry.arguments?.getString("routineTurn") ?: "Mañana"
+
             CreateRoutineScreen(
                 routineTurn = turn,
                 childName = "Mateo",
-                pasosSeleccionados = pasosSeleccionados,
+                // Ahora usamos las descripciones de las tareas del ViewModel
+                // pasosSeleccionados = tareasPorEnviar.map { it.description },
+                // AHORA
+                pasosSeleccionados = tareasPorEnviar,
                 onBackClick = { navController.popBackStack() },
                 onNavigateToPictogramSearch = { navController.navigate("pictogram_selection") },
                 onSendRoutine = {
-                    pasosSeleccionados.clear()
+                    // Aquí llamamos a la función real de Firebase
+                    routineViewModel.saveAll("ID_DEL_PADRE_AQUI")
                     navController.navigate("parent_dashboard")
                 },
                 drawableId = R.drawable.logo_upad
@@ -165,9 +186,11 @@ fun UPadNavigation() {
 
         composable("pictogram_selection") {
             PictogramSelectionScreen(
+                viewModel = routineViewModel,
                 onBackClick = { navController.popBackStack() },
-                onPictogramSelected = { nombre ->
-                    pasosSeleccionados.add(nombre)
+                onPictogramSelected = { nombre, url ->
+                    // Agregamos la tarea real con su imagen de ARASAAC
+                    routineViewModel.addTask(nombre, url)
                     navController.popBackStack()
                 }
             )
