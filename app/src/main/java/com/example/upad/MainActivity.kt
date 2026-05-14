@@ -10,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 // Importaciones de tus pantallas
 import com.example.upad.child.TaskExecutionScreen
@@ -40,6 +41,7 @@ import com.example.upad.viewmodel.RoutineViewModelFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent {
             // CAMBIO CLAVE: Llamamos a la navegación principal, no solo a una pantalla suelta
