@@ -35,9 +35,7 @@ fun iniciarSesionConGoogle(context: Context, coroutineScope: CoroutineScope, onR
     val credentialManager = CredentialManager.create(context)
     val auth = FirebaseAuth.getInstance()
 
-    // ⚠️ IMPORTANTE: Reemplaza este texto por el Client ID que está en tu google-services.json
-    // Búscalo en la sección "oauth_client" (el que tiene "client_type": 3)
-    val webClientId = "TU_WEB_CLIENT_ID_AQUÍ.apps.googleusercontent.com"
+    val webClientId = "260484998013-vu5f1gv7ol1dr9kbiiqnjqo7l1q7r6pg.apps.googleusercontent.com"
 
     val googleIdOption = GetGoogleIdOption.Builder()
         .setFilterByAuthorizedAccounts(false)
