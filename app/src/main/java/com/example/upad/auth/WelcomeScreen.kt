@@ -1,29 +1,98 @@
 package com.example.upad.auth
 
+import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
 import com.example.upad.R
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
+// --- 1. LÓGICA DE AUTENTICACIÓN CON GOOGLE Y FIREBASE ---
+fun iniciarSesionConGoogle(context: Context, coroutineScope: CoroutineScope, onResultado: (Boolean) -> Unit) {
+    val credentialManager = CredentialManager.create(context)
+    val auth = FirebaseAuth.getInstance()
+
+    // ⚠️ IMPORTANTE: Reemplaza este texto por el Client ID que está en tu google-services.json
+    // Búscalo en la sección "oauth_client" (el que tiene "client_type": 3)
+    val webClientId = "TU_WEB_CLIENT_ID_AQUÍ.apps.googleusercontent.com"
+
+    val googleIdOption = GetGoogleIdOption.Builder()
+        .setFilterByAuthorizedAccounts(false)
+        .setServerClientId(webClientId)
+        .setAutoSelectEnabled(true)
+        .build()
+
+    val request = GetCredentialRequest.Builder()
+        .addCredentialOption(googleIdOption)
+        .build()
+
+    coroutineScope.launch {
+        try {
+            val result = credentialManager.getCredential(context = context, request = request)
+            val credential = result.credential
+
+            if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                val idToken = googleIdTokenCredential.idToken
+
+                val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
+                auth.signInWithCredential(firebaseCredential)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            Log.d("GoogleAuth", "Login exitoso: ${auth.currentUser?.displayName}")
+                            onResultado(true)
+                        } else {
+                            Log.e("GoogleAuth", "Fallo al conectar con Firebase", task.exception)
+                            onResultado(false)
+                        }
+                    }
+            }
+        } catch (e: GetCredentialException) {
+            Log.e("GoogleAuth", "Error del Credential Manager: ${e.message}")
+            onResultado(false)
+        } catch (e: Exception) {
+            Log.e("GoogleAuth", "Error desconocido: ${e.message}")
+            onResultado(false)
+        }
+    }
+}
+
+// --- 2. INTERFAZ DE USUARIO (TU DISEÑO) ---
 @Composable
 fun WelcomeScreen(
     onNavigateToLogin: () -> Unit,
     onNavigateToRegister: () -> Unit,
-    onGoogleSignInClick: () -> Unit // Nueva función para la lógica de Google
+    onLoginExitoso: () -> Unit // Callback para cuando Google dice "OK"
 ) {
     val colorAzulTEA = Color(0xFF4FC3F7)
     val colorFondoBase = Color(0xFFF0F4F8)
+
+    // Herramientas necesarias para lanzar la hoja flotante de Android
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -99,9 +168,16 @@ fun WelcomeScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // --- BOTÓN DE GOOGLE ACTUALIZADO ---
+            // --- BOTÓN DE GOOGLE ---
             OutlinedButton(
-                onClick = onGoogleSignInClick, // Ahora llama a la lógica externa
+                onClick = {
+                    // Ejecutamos la función de la línea 33 al hacer clic
+                    iniciarSesionConGoogle(context, coroutineScope) { exitoso ->
+                        if (exitoso) {
+                            onLoginExitoso() // Cambia de pantalla si el login fue correcto
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(65.dp),
@@ -112,9 +188,13 @@ fun WelcomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    // Puedes añadir el icono de Google aquí si lo tienes en res/drawable
-                    // Icon(painter = painterResource(id = R.drawable.ic_google), contentDescription = null, tint = Color.Unspecified)
-                    // Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_menu_login),
+                        contentDescription = "Google Icon",
+                        tint = Color.Unspecified,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = "CONTINUAR CON GOOGLE",
                         fontSize = 16.sp,

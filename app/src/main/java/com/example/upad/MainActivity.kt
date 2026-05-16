@@ -55,7 +55,6 @@ fun UPadNavigation() {
     val navController = rememberNavController()
 
     // 1. Inicializamos el Repositorio y el ViewModel
-    // Nota: Si no tienes una Factory, puedes instanciarlo simple por ahora:
     val repository = remember { FirebaseRepository() }
     val routineViewModel: RoutineViewModel = viewModel(
         factory = com.example.upad.viewmodel.RoutineViewModelFactory(repository)
@@ -68,7 +67,7 @@ fun UPadNavigation() {
         navController = navController,
         startDestination = "role_selection"
     ) {
-        // --- SECCIÓN AUTENTICACIÓN Y ROLES (Sin cambios) ---
+        // --- SECCIÓN AUTENTICACIÓN Y ROLES ---
         composable("role_selection") {
             RoleSelectionScreen(
                 onRoleSelected = { role ->
@@ -82,7 +81,13 @@ fun UPadNavigation() {
             WelcomeScreen(
                 onNavigateToLogin = { navController.navigate("login") },
                 onNavigateToRegister = { navController.navigate("register") },
-                onGoogleSignInClick = { println("Google Login") }
+                // AQUI ESTÁ EL CAMBIO: Usamos onLoginExitoso y mandamos al dashboard
+                onLoginExitoso = {
+                    navController.navigate("parent_dashboard") {
+                        // Esto limpia el historial para que no pueda darle "atrás" y volver al login
+                        popUpTo("welcome") { inclusive = true }
+                    }
+                }
             )
         }
 
@@ -171,14 +176,10 @@ fun UPadNavigation() {
             CreateRoutineScreen(
                 routineTurn = turn,
                 childName = "Mateo",
-                // Ahora usamos las descripciones de las tareas del ViewModel
-                // pasosSeleccionados = tareasPorEnviar.map { it.description },
-                // AHORA
                 pasosSeleccionados = tareasPorEnviar,
                 onBackClick = { navController.popBackStack() },
                 onNavigateToPictogramSearch = { navController.navigate("pictogram_selection") },
                 onSendRoutine = {
-                    // Aquí llamamos a la función real de Firebase
                     routineViewModel.saveAll("ID_DEL_PADRE_AQUI")
                     navController.navigate("parent_dashboard")
                 },
@@ -191,7 +192,6 @@ fun UPadNavigation() {
                 viewModel = routineViewModel,
                 onBackClick = { navController.popBackStack() },
                 onPictogramSelected = { nombre, url ->
-                    // Agregamos la tarea real con su imagen de ARASAAC
                     routineViewModel.addTask(nombre, url)
                     navController.popBackStack()
                 }
@@ -254,5 +254,5 @@ fun UPadNavigation() {
         composable("activity_details") {
             ActivityDetailsScreen(onBack = { navController.popBackStack() })
         }
-    } // Aquí cierra el NavHost
-} // Aquí cierra el UPadNavigation
+    }
+}

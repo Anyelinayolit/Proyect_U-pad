@@ -68,7 +68,7 @@ dependencies {
     implementation("com.google.firebase:firebase-database")
     implementation("com.google.firebase:firebase-auth")
 
-    //Firebase Storage
+    // Firebase Storage
     implementation("com.google.firebase:firebase-storage")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
@@ -77,4 +77,12 @@ dependencies {
 
     // Coil para mostrar las imágenes de ARASAAC
     implementation("io.coil-kt:coil-compose:2.4.0")
+
+    // Librerias para firebase
+    implementation(libs.firebase.auth)
+    implementation(libs.play.services.auth)
+
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
 }
