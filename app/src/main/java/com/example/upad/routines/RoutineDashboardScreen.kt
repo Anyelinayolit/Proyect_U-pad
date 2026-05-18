@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Lock // 👈 IMPORTADO PARA EL ICONO DE BLOQUEO
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Person
@@ -86,7 +87,8 @@ fun RoutineDashboardScreen(
     onNavigateToAnalytics: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
-    onNavigateToConnection: () -> Unit = {}
+    onNavigateToConnection: () -> Unit = {},
+    onNavigateToDeviceManagement: () -> Unit = {} // 🔥 PASO 3: NUEVA PROP PARA ENLAZAR LA PANTALLA
 ) {
     val colorAzulTEA = Color(0xFF4FC3F7)
     val colorFondoBase = Color(0xFFF0F4F8)
@@ -147,7 +149,7 @@ fun RoutineDashboardScreen(
         task.dias.any { it.uppercase().startsWith(diaSeleccionado.take(3)) } || task.dias.isEmpty()
     }
 
-    // --- 🛠️ CLAVE DE FECHA NORMALIZADA PARA EL CONTADOR (LUN, MAR, MIÉ...) ---
+    // --- CLAVE DE FECHA NORMALIZADA PARA EL CONTADOR (LUN, MAR, MIÉ...) ---
     val prefijoDiaSeleccionado = when (diaSeleccionado) {
         "MIÉRCOLES", "MIERCOLES" -> "MIÉ"
         "SÁBADO", "SABADO" -> "SÁB"
@@ -159,7 +161,6 @@ fun RoutineDashboardScreen(
             name = "MAÑANA",
             icon = Icons.Default.LightMode,
             totalTasks = tasksMananaFiltradas.size,
-            // 🔥 CORREGIDO ROJO: Usamos la validación por mapa de días
             completedTasks = tasksMananaFiltradas.count { it.estaCompletadaHoy(prefijoDiaSeleccionado) },
             color = Color(0xFFFFB74D)
         ),
@@ -167,7 +168,6 @@ fun RoutineDashboardScreen(
             name = "TARDE",
             icon = Icons.Default.WbTwilight,
             totalTasks = tasksTardeFiltradas.size,
-            // 🔥 CORREGIDO ROJO: Usamos la validación por mapa de días
             completedTasks = tasksTardeFiltradas.count { it.estaCompletadaHoy(prefijoDiaSeleccionado) },
             color = Color(0xFF81C784)
         ),
@@ -175,7 +175,6 @@ fun RoutineDashboardScreen(
             name = "NOCHE",
             icon = Icons.Default.NightsStay,
             totalTasks = tasksNocheFiltradas.size,
-            // 🔥 CORREGIDO ROJO: Usamos la validación por mapa de días
             completedTasks = tasksNocheFiltradas.count { it.estaCompletadaHoy(prefijoDiaSeleccionado) },
             color = Color(0xFF9575CD)
         )
@@ -214,6 +213,19 @@ fun RoutineDashboardScreen(
                     onClick = { scope.launch { drawerState.close() }; onNavigateToAnalytics() },
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
+
+                // 🔥 PASO 3 INTERNO: ADICIÓN DEL BOTÓN EN EL MENÚ DESPLEGABLE
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Lock, contentDescription = null, tint = colorAzulTEA) },
+                    label = { Text("Bloquear Dispositivo", fontWeight = FontWeight.Medium) },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToDeviceManagement() // Ejecuta el salto de pantalla
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Link, contentDescription = null, tint = colorAzulTEA) },
                     label = { Text("Conectar con el Niño (Código)", fontWeight = FontWeight.Medium) },

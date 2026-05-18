@@ -1,21 +1,33 @@
 package com.example.upad
 
-import androidx.compose.ui.Modifier
+import android.app.Activity
+import android.os.Build
 import android.os.Bundle
-import androidx.fragment.app.FragmentActivity
+import android.provider.Settings
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.google.firebase.database.*
 
 // Importaciones de tus pantallas
-import com.example.upad.child.TaskExecutionScreen
 import com.example.upad.auth.ForgotPasswordScreen
 import com.example.upad.auth.LoginScreen
 import com.example.upad.auth.RegisterScreen
@@ -23,11 +35,13 @@ import com.example.upad.auth.RoleSelectionScreen
 import com.example.upad.auth.WelcomeScreen
 import com.example.upad.child.ChildStartScreen
 import com.example.upad.child.RoutineCompletedScreen
+import com.example.upad.child.TaskExecutionScreen
 import com.example.upad.child.TaskFeedbackScreen
 import com.example.upad.dashboard.AchievementReportScreen
 import com.example.upad.dashboard.ActivityDetailsScreen
 import com.example.upad.dashboard.NotificationsScreen
 import com.example.upad.dashboard.RoutineDashboardScreen
+import com.example.upad.dashboard.DeviceManagementScreen
 import com.example.upad.data.FirebaseRepository
 import com.example.upad.routines.CreateRoutineScreen
 import com.example.upad.routines.PictogramSelectionScreen
@@ -37,20 +51,6 @@ import com.example.upad.setup.ExperienceSetupScreen
 import com.example.upad.setup.SubscriptionPlansScreen
 import com.example.upad.setup.TrialDisclaimerScreen
 import com.example.upad.setup.TutorialsScreen
-
-import com.example.upad.viewmodel.RoutineViewModelFactory
-import androidx.compose.material3.Scaffold
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.fillMaxSize
-import android.app.Activity
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowInsetsControllerCompat
-
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-
-// subpantallas
 import com.example.upad.dashboard.ProfileScreen
 import com.example.upad.dashboard.SettingsScreen
 import com.example.upad.viewmodel.RoutineViewModel
@@ -58,28 +58,101 @@ import com.example.upad.dashboard.ConnectionScreen
 import com.example.upad.dashboard.AnalyticsScreen
 
 class MainActivity : FragmentActivity() {
+
+    // Escucha remota de Firebase
+    private var ordenBloqueoPadreActiva by mutableStateOf(false)
+    private val database = FirebaseDatabase.getInstance().reference
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+
+        database.child("dispositivos_niños").child(deviceId)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (snapshot.exists()) {
+                        val kioscoActivo = snapshot.child("kioscoActivo").getValue(Boolean::class.java) ?: false
+                        ordenBloqueoPadreActiva = kioscoActivo
+                    }
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+
         setContent {
-            UPadNavigation()
+            UPadNavigation(ordenBloqueoPadreActiva, ::gestionarRestriccionesSistema)
+        }
+    }
+
+    /**
+     * Esta es la clave: Oculta la HORA, BATERÍA y BOTONES de salir,
+     * pero NO bloquea los contenidos visuales de la app.
+     */
+    private fun gestionarRestriccionesSistema(activarFijacionKiosco: Boolean) {
+        if (activarFijacionKiosco) {
+            // Impedir que la pantalla se suspenda mientras el niño hace su rutina bajo supervisión
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+            // 🚫 DESAPARECE LA HORA, NOTIFICACIONES Y BATERÍA (Status Bar) + BOTONES DE ABAJO (Navigation Bar)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                window.insetsController?.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+            } else {
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility = (
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                or View.SYSTEM_UI_FLAG_FULLSCREEN
+                        )
+            }
+
+            // 🔒 ANCLAJE DE HARDWARE: Bloquea los gestos y botones físicos para que no pueda salirse de la app
+            try { startLockTask() } catch (e: Exception) { e.printStackTrace() }
+        } else {
+            // Regresa todo a la normalidad cuando el padre lo libera
+            try {
+                stopLockTask()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    window.insetsController?.show(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+                } else {
+                    @Suppress("DEPRECATION")
+                    window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                }
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } catch (e: Exception) { e.printStackTrace() }
         }
     }
 }
 
 @Composable
-fun UPadNavigation() {
+fun UPadNavigation(
+    bloqueoActivo: Boolean,
+    onCambiarEstadoSistema: (Boolean) -> Unit
+) {
     val navController = rememberNavController()
-
-    // Inicializamos el Repositorio y el ViewModel
     val repository = remember { FirebaseRepository() }
     val routineViewModel: RoutineViewModel = viewModel(
         factory = com.example.upad.viewmodel.RoutineViewModelFactory(repository)
     )
 
-    // --- SOLUCIÓN PARA VER LA HORA Y BATERÍA ---
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val rutaActual = navBackStackEntry?.destination?.route ?: ""
+
+    // Detectamos si está interactuando en las pantallas del menor
+    val estaEnSeccionNiño = rutaActual.startsWith("child_")
+
+    // Aplicamos el aislamiento del sistema de forma reactiva
+    LaunchedEffect(bloqueoActivo, estaEnSeccionNiño) {
+        if (bloqueoActivo && estaEnSeccionNiño) {
+            onCambiarEstadoSistema(true)  // Quita hora, batería y congela salidas
+        } else {
+            onCambiarEstadoSistema(false) // Muestra todo normal
+        }
+    }
+
+    // Comportamiento de barras transparentes para las secciones del padre o login
     val view = LocalView.current
-    if (!view.isInEditMode) {
+    if (!view.isInEditMode && !(bloqueoActivo && estaEnSeccionNiño)) {
         val activity = view.context as Activity
         val window = activity.window
         window.statusBarColor = android.graphics.Color.TRANSPARENT
@@ -95,6 +168,9 @@ fun UPadNavigation() {
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // 🛠️ ¡CAMBIO CLAVE AQUÍ!: Eliminamos la pantalla azul intrusiva.
+            // Ahora el NavHost SIGUE CORRIENDO SIEMPRE. Las rutinas del niño no se interrumpen.
+            // Lo único que cambia es que, a nivel de sistema, el dispositivo se "ciega" y se congela el entorno.
             NavHost(
                 navController = navController,
                 startDestination = "role_selection"
@@ -217,7 +293,8 @@ fun UPadNavigation() {
                         onNavigateToProfile = { navController.navigate("profile") },
                         onNavigateToSettings = { navController.navigate("settings") },
                         onNavigateToConnection = { navController.navigate("connection_code") },
-                        onNavigateToAnalytics = { navController.navigate("analytics") }
+                        onNavigateToAnalytics = { navController.navigate("analytics") },
+                        onNavigateToDeviceManagement = { navController.navigate("device_management") }
                     )
                 }
 
@@ -255,6 +332,12 @@ fun UPadNavigation() {
                     )
                 }
 
+                composable("device_management") {
+                    DeviceManagementScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
                 composable(
                     route = "create_routine/{routineTurn}",
                     arguments = listOf(navArgument("routineTurn") { type = NavType.StringType })
@@ -279,7 +362,6 @@ fun UPadNavigation() {
                             navController.navigate("parent_dashboard")
                         },
                         viewModel = routineViewModel,
-                        // 🛠️ FIX: Se cambia por el recurso de ID genérico de Android si tu logo no compila temporalmente
                         drawableId = android.R.drawable.ic_menu_manage
                     )
                 }
@@ -300,13 +382,12 @@ fun UPadNavigation() {
                     )
                 }
 
-                // --- 🔥 SECCIÓN NIÑO CORREGIDA CON INTEGRADOR AUTOMÁTICO RE-DISEÑADO ---
+                // --- SECCIÓN NIÑO ---
                 composable("child_start") {
                     ChildStartScreen(
                         routineViewModel = routineViewModel,
-                        onNavigateToTask = { actividadNombre, turn ->
-                            // El botón automático calcula la tarea vigente y lo inyecta a la pantalla de ejecución
-                            navController.navigate("child_task_execution/$turn")
+                        onNavigateToTask = { actividadNombre, turno ->
+                            navController.navigate("child_task_execution/$actividadNombre/$turno")
                         },
                         onNavigateToCompleted = {
                             navController.navigate("child_routine_completed")
@@ -315,20 +396,21 @@ fun UPadNavigation() {
                 }
 
                 composable(
-                    route = "child_task_execution/{routineTurn}",
-                    arguments = listOf(navArgument("routineTurn") { type = NavType.StringType })
+                    route = "child_task_execution/{activityName}/{routineTurn}",
+                    arguments = listOf(
+                        navArgument("activityName") { type = NavType.StringType },
+                        navArgument("routineTurn") { type = NavType.StringType }
+                    )
                 ) { backStackEntry ->
+                    val activityName = backStackEntry.arguments?.getString("activityName") ?: "Actividad"
                     val turn = backStackEntry.arguments?.getString("routineTurn") ?: "MAÑANA"
-
-                    LaunchedEffect(turn) {
-                        routineViewModel.cargarRutinasDesdeFirebase("PADRE_TEST")
-                    }
 
                     TaskExecutionScreen(
                         viewModel = routineViewModel,
+                        activityName = activityName,
                         turn = turn,
-                        onFinishRoutine = {
-                            navController.navigate("child_task_feedback/Rutina Completada")
+                        onFinishRoutine = { nombreDeLaTareaCompletada ->
+                            navController.navigate("child_task_feedback/$nombreDeLaTareaCompletada")
                         }
                     )
                 }
@@ -342,13 +424,16 @@ fun UPadNavigation() {
                     TaskFeedbackScreen(
                         activityName = activityName,
                         onFeedbackSelected = { _ ->
-                            navController.navigate("child_routine_completed")
+                            navController.navigate("child_routine_completed") {
+                                popUpTo("child_start") { inclusive = false }
+                            }
                         }
                     )
                 }
 
                 composable("child_routine_completed") {
                     RoutineCompletedScreen(
+                        nextActivityPreview = "¡Felicidades! Completaste todo",
                         onFinishClick = {
                             navController.navigate("child_start") {
                                 popUpTo("child_start") { inclusive = true }

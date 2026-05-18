@@ -21,37 +21,38 @@ import kotlinx.coroutines.delay
 @Composable
 fun TaskExecutionScreen(
     viewModel: RoutineViewModel,
+    activityName: String, // 🔥 CLAVE: Recibe el nombre específico de la actividad que le toca hacer
     turn: String,
-    onFinishRoutine: () -> Unit
+    onFinishRoutine: (String) -> Unit
 ) {
     val colorFondoNiño = Color(0xFFE1F5FE)
     val colorVerdeExito = Color(0xFF4CAF50)
-    val colorNaranjaEspera = Color(0xFFFFB74D)
 
     val currentUserId = remember {
         FirebaseAuth.getInstance().currentUser?.uid ?: "PADRE_TEST"
     }
 
+    // Recolectamos las tareas del turno actual desde el ViewModel
     val tasks by when (turn.uppercase()) {
         "MAÑANA" -> viewModel.tasksManana.collectAsState()
         "TARDE" -> viewModel.tasksTarde.collectAsState()
         else -> viewModel.tasksNoche.collectAsState()
     }
 
-    var currentTaskIndex by remember { mutableIntStateOf(0) }
-    var mostrandoCelebracionIdivual by remember { mutableStateOf(false) }
-
-    LaunchedEffect(tasks.size) {
-        if (currentTaskIndex >= tasks.size && tasks.isNotEmpty()) {
-            currentTaskIndex = 0
-        }
+    // 🔍 BUSCAMOS EXCLUSIVAMENTE LA ACTIVIDAD QUE LE PERTENECE A ESTA PANTALLA
+    val currentTask = remember(tasks, activityName) {
+        tasks.firstOrNull { it.actividad.uppercase().trim() == activityName.uppercase().trim() }
     }
 
+    var mostrandoCelebracionIdivual by remember { mutableStateOf(false) }
+
+    // --- MANEJADOR DE TRANSICIÓN INTEGRADO ---
     if (mostrandoCelebracionIdivual) {
         LaunchedEffect(Unit) {
             delay(2000)
             mostrandoCelebracionIdivual = false
-            currentTaskIndex++
+            // 🔥 Como ya terminó ESTA actividad, viaja directo a la encuesta de emociones
+            onFinishRoutine(activityName)
         }
     }
 
@@ -74,11 +75,12 @@ fun TaskExecutionScreen(
             .background(colorFondoNiño),
         contentAlignment = Alignment.Center
     ) {
-        if (tasks.isEmpty()) {
+        if (currentTask == null) {
+            // Pantalla de carga por si Firebase se demora un milisegundo en sincronizar
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator(color = Color(0xFF0288D1))
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Buscando tus actividades...", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF01579B))
+                Text("Cargando tu actividad...", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF01579B))
             }
         }
         else if (mostrandoCelebracionIdivual) {
@@ -94,16 +96,15 @@ fun TaskExecutionScreen(
                 Text(text = "✨ ¡Eres genial! ✨", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0288D1), textAlign = TextAlign.Center)
             }
         }
-        else if (currentTaskIndex < tasks.size) {
-            val currentTask = tasks[currentTaskIndex]
-
+        else {
+            // Muestra de forma gigante y clara la ÚNICA actividad pendiente
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxSize().padding(24.dp)
             ) {
                 Text(
-                    text = "ACTIVIDAD ${currentTaskIndex + 1} DE ${tasks.size}",
+                    text = "ACTIVIDAD EN CURSO",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF0288D1).copy(alpha = 0.8f)
@@ -150,16 +151,16 @@ fun TaskExecutionScreen(
                     color = Color.Gray
                 )
 
-                // --- 🛠️ BOTÓN DE LOGRO TOTALMENTE REPARADO ---
                 Button(
                     onClick = {
-                        // Cambiamos la función vieja por la inteligente basada en nombre y fecha actual
+                        // Se marca la actividad como completada en la base de datos
                         viewModel.completeTaskPorNombre(
                             userId = currentUserId,
                             turn = turn,
                             actividadTexto = currentTask.actividad,
                             diaActual = diaActualTexto
                         )
+                        // Dispara la animación de estrellas
                         mostrandoCelebracionIdivual = true
                     },
                     modifier = Modifier.fillMaxWidth(0.85f).height(80.dp),
@@ -167,56 +168,12 @@ fun TaskExecutionScreen(
                     shape = RoundedCornerShape(24.dp)
                 ) {
                     Text(
-                        text = if (currentTaskIndex == tasks.size - 1) "¡TERMINAR! 🎉" else "¡HECHO! 👍",
+                        text = "¡TERMINAR! 🎉",
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White
                     )
                 }
-            }
-        }
-        else {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp)
-            ) {
-                Text(
-                    text = "🛋️ ✨ O_o",
-                    fontSize = 90.sp,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Text(
-                    text = "¡TIEMPO DE DESCANSO!",
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF1565C0),
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Lo hiciste increíble. Puedes relajarte un momento mientras tu tutor prepara tu siguiente activity.",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.Gray,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                CircularProgressIndicator(
-                    color = colorNaranjaEspera,
-                    strokeWidth = 6.dp,
-                    modifier = Modifier.size(50.dp)
-                )
             }
         }
     }

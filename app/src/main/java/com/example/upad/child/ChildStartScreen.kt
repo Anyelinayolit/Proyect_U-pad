@@ -46,10 +46,8 @@ fun ChildStartScreen(
 
     val database = remember { FirebaseDatabase.getInstance().reference }
 
-    // --- 📡 FIJADO: ESCUCHA CONSTANTE EN TIEMPO REAL DESDE LA NUBE ---
+    // --- 📡 ESCUCHA CONSTANTE EN TIEMPO REAL DESDE LA NUBE ---
     LaunchedEffect(deviceId) {
-        // Cambiado a addValueEventListener para que el niño dependa ÚNICAMENTE de los cambios en la nube de Firebase,
-        // sin importar el estado del teléfono del padre.
         database.child("dispositivos_niños").child(deviceId)
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
@@ -58,7 +56,6 @@ fun ChildStartScreen(
                         padreIdAsociado = pId
                         estaVinculado = true
 
-                        // Sincroniza las rutinas de este padre de forma directa e independiente
                         routineViewModel.cargarRutinasDesdeFirebase(pId)
                         cargando = false
                     } else {
@@ -159,7 +156,6 @@ fun ChildStartScreen(
 
                     Button(
                         onClick = {
-                            // 🔥 Aseguramos una última consulta limpia al repositorio antes de evaluar el salto
                             if (padreIdAsociado.isNotEmpty()) {
                                 routineViewModel.cargarRutinasDesdeFirebase(padreIdAsociado)
                             }
@@ -207,11 +203,12 @@ fun ChildStartScreen(
                                 }
                             }
 
+                            // 🔍 Filtro estricto: Trae únicamente el primer objeto que no reporte completado hoy
                             val primeraMananaPendiente = mañanaFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
                             val primeraTardePendiente = tardeFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
                             val primeraNochePendiente = nocheFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
 
-                            // 🗺️ ENRUTADOR DINÁMICO
+                            // 🗺️ ENRUTADOR DINÁMICO RE-EVALUADO
                             when {
                                 primeraMananaPendiente != null -> {
                                     onNavigateToTask(primeraMananaPendiente.actividad, "MAÑANA")
