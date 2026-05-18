@@ -46,15 +46,19 @@ fun ChildStartScreen(
 
     val database = remember { FirebaseDatabase.getInstance().reference }
 
-    // --- LOGICA DE CONEXIÓN A FIREBASE EN TIEMPO REAL ---
+    // --- 📡 FIJADO: ESCUCHA CONSTANTE EN TIEMPO REAL DESDE LA NUBE ---
     LaunchedEffect(deviceId) {
+        // Cambiado a addValueEventListener para que el niño dependa ÚNICAMENTE de los cambios en la nube de Firebase,
+        // sin importar el estado del teléfono del padre.
         database.child("dispositivos_niños").child(deviceId)
-            .addListenerForSingleValueEvent(object : ValueEventListener {
+            .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     if (snapshot.exists() && snapshot.hasChild("padreId")) {
                         val pId = snapshot.child("padreId").getValue(String::class.java) ?: ""
                         padreIdAsociado = pId
                         estaVinculado = true
+
+                        // Sincroniza las rutinas de este padre de forma directa e independiente
                         routineViewModel.cargarRutinasDesdeFirebase(pId)
                         cargando = false
                     } else {
@@ -155,6 +159,11 @@ fun ChildStartScreen(
 
                     Button(
                         onClick = {
+                            // 🔥 Aseguramos una última consulta limpia al repositorio antes de evaluar el salto
+                            if (padreIdAsociado.isNotEmpty()) {
+                                routineViewModel.cargarRutinasDesdeFirebase(padreIdAsociado)
+                            }
+
                             val calendar = Calendar.getInstance()
                             val numeroDia = calendar.get(Calendar.DAY_OF_WEEK)
 
@@ -180,7 +189,6 @@ fun ChildStartScreen(
                                 else -> emptyList()
                             }
 
-                            // 🛠️ SOLUCIÓN DE ERRORES: Quitamos el tipado explícito rígido para que infiera el tipo correcto del ViewModel automáticamente
                             val mañanaFiltradas = tasksManana.filter { tarea ->
                                 if (tarea.dias.isEmpty()) true else {
                                     tarea.dias.any { d -> listaVariacionesDia.contains(d.uppercase().trim()) }

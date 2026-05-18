@@ -20,13 +20,16 @@ import com.example.upad.R
 
 @Composable
 fun RoutineCompletedScreen(
-    nextActivityPreview: String = "¡VAMOS AL COLEGIO!",
+    // 🛠️ CORREGIDO: Ahora el valor por defecto avisa que todo está al día
+    nextActivityPreview: String = "¡Felicidades! Completaste todo",
     onFinishClick: () -> Unit
 ) {
-    // Manteniendo la paleta de colores TEA profesional
     val colorAzulTEA = Color(0xFF4FC3F7)
     val colorVerdeTEA = Color(0xFF81C784)
     val colorFondoBase = Color(0xFFF0F4F8)
+
+    // Detectamos si viene el texto por defecto para cambiar los mensajes informativos
+    val esFinDeRutina = nextActivityPreview == "¡Felicidades! Completaste todo"
 
     Column(
         modifier = Modifier
@@ -46,11 +49,11 @@ fun RoutineCompletedScreen(
                 text = "¡LO LOGRASTE!",
                 fontSize = 36.sp,
                 fontWeight = FontWeight.Black,
-                color = colorVerdeTEA, // Verde para indicar éxito
+                color = colorVerdeTEA,
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "Completaste toda la actividad",
+                text = if (esFinDeRutina) "No tienes tareas pendientes" else "Completaste toda la actividad",
                 fontSize = 18.sp,
                 color = Color.Gray,
                 fontWeight = FontWeight.Medium
@@ -76,7 +79,6 @@ fun RoutineCompletedScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    // Cargamos tu imagen llamada "celebracion"
                     Image(
                         painter = painterResource(id = R.drawable.celebracion),
                         contentDescription = "Celebración",
@@ -100,7 +102,7 @@ fun RoutineCompletedScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "PRÓXIMA ACTIVIDAD:",
+                text = if (esFinDeRutina) "ESTADO DE HOY:" else "PRÓXIMA ACTIVIDAD:",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Gray,
@@ -118,7 +120,7 @@ fun RoutineCompletedScreen(
             )
 
             Text(
-                text = "Rutinas escolares cargadas",
+                text = if (esFinDeRutina) "¡Es hora de descansar o jugar! 🎉" else "Rutinas actualizadas",
                 fontSize = 14.sp,
                 color = Color.LightGray,
                 modifier = Modifier.padding(top = 4.dp)
@@ -126,7 +128,7 @@ fun RoutineCompletedScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // BOTÓN SIGUIENTE PROFESIONAL
+            // BOTÓN SIGUIENTE
             Button(
                 onClick = onFinishClick,
                 modifier = Modifier
@@ -137,7 +139,7 @@ fun RoutineCompletedScreen(
                 elevation = ButtonDefaults.buttonElevation(6.dp)
             ) {
                 Text(
-                    text = "SIGUIENTE ➔",
+                    text = "ENTENDIDO ➔",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Black,
                     color = Color.White
