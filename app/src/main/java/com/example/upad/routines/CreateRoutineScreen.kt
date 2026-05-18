@@ -1,8 +1,11 @@
 package com.example.upad.routines
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,15 +26,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.upad.viewmodel.TaskItem
 import com.example.upad.viewmodel.RoutineViewModel
-import com.google.firebase.auth.FirebaseAuth // <-- IMPORTANTE: Añadimos el import de FirebaseAuth
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateRoutineScreen(
     routineTurn: String = "Mañana",
     childName: String = "tu hijo",
-    pasosSeleccionados: List<TaskItem>,
+    pasosSeleccionados: List<TaskItem>, // Lista en crudo desde Firebase
     onBackClick: () -> Unit,
     onNavigateToPictogramSearch: () -> Unit,
     onSendRoutine: () -> Unit,
@@ -39,7 +43,6 @@ fun CreateRoutineScreen(
     viewModel: RoutineViewModel,
     drawableId: Int
 ) {
-    // Obtenemos el userId real de la sesión activa
     val currentUserId = remember {
         FirebaseAuth.getInstance().currentUser?.uid ?: "PADRE_TEST"
     }
@@ -51,9 +54,34 @@ fun CreateRoutineScreen(
     val diasDeLaSemana = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
     val diasSeleccionados = remember { mutableStateListOf<String>() }
 
+    // --- 📅 DETECTOR INTELIGENTE DEL DÍA ACTUAL DE LA SEMANA ---
+    val diaActualDelReloj = remember {
+        when (Calendar.getInstance().get(Calendar.DAY_OF_WEEK)) {
+            Calendar.MONDAY -> "Lun"
+            Calendar.TUESDAY -> "Mar"
+            Calendar.WEDNESDAY -> "Mié"
+            Calendar.THURSDAY -> "Jue"
+            Calendar.FRIDAY -> "Vie"
+            Calendar.SATURDAY -> "Sáb"
+            Calendar.SUNDAY -> "Dom"
+            else -> "Lun"
+        }
+    }
+
+    // El filtro del adulto se inicializa de forma automática en el día presente del sistema
+    var diaFiltroSeleccionado by remember { mutableStateOf(diaActualDelReloj) }
+
     val colorAzulTEA = Color(0xFF4FC3F7)
     val colorAmarilloTEA = Color(0xFFFFD54F)
     val colorFondoBase = Color(0xFFF0F4F8)
+
+    // --- 🛠️ FILTRADO INTELIGENTE REACTIVO PARA LA INTERFAZ ---
+    // Filtramos la lista en tiempo real para que coincida exactamente con las reglas de negocio
+    val pasosFiltradosPorDia = remember(pasosSeleccionados, diaFiltroSeleccionado) {
+        pasosSeleccionados.filter { tarea ->
+            tarea.dias.isEmpty() || tarea.dias.any { it.uppercase().trim().startsWith(diaFiltroSeleccionado.uppercase()) }
+        }
+    }
 
     if (showSendingDialog) {
         SendingRoutineDialog(
@@ -63,9 +91,7 @@ fun CreateRoutineScreen(
         )
 
         LaunchedEffect(Unit) {
-            // Sincronizamos usando el id del usuario dinámico actual
             viewModel.saveAll(currentUserId, routineTurn)
-
             delay(2000)
             showSendingDialog = false
             onSendRoutine()
@@ -122,9 +148,9 @@ fun CreateRoutineScreen(
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // --- FORMULARIO INTELIGENTE ---
+            // --- FORMULARIO NUEVA ACTIVIDAD ---
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -176,7 +202,6 @@ fun CreateRoutineScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // --- CORREGIDO: BOTÓN TOTALMENTE COMPATIBLE CON EL NUEVO VIEWMODEL ---
                     Button(
                         onClick = {
                             if (nombreActividad.isNotEmpty()) {
@@ -186,6 +211,10 @@ fun CreateRoutineScreen(
                                     textoCompleto = nombreActividad,
                                     diasSeleccionados = diasSeleccionados.toList()
                                 )
+                                // Seteamos el visor del día de forma automática al primer día asignado
+                                if(diasSeleccionados.isNotEmpty()){
+                                    diaFiltroSeleccionado = diasSeleccionados.first()
+                                }
                                 nombreActividad = ""
                                 diasSeleccionados.clear()
                             }
@@ -203,16 +232,59 @@ fun CreateRoutineScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // --- BARRA SELECTORA SEMANAL INTEGRADORA ---
+            Text(
+                text = "VER AGENDA SEMANAL:",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(diasDeLaSemana) { dia ->
+                    val esElDiaActivo = (dia == diaFiltroSeleccionado)
+                    val esHoyDelSistema = (dia == diaActualDelReloj)
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                when {
+                                    esElDiaActivo -> colorAzulTEA
+                                    esHoyDelSistema -> colorAzulTEA.copy(alpha = 0.15f)
+                                    else -> Color.White
+                                }
+                            )
+                            .clickable { diaFiltroSeleccionado = dia }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (esHoyDelSistema) "$dia (Hoy)" else dia,
+                            fontSize = 13.sp,
+                            fontWeight = if (esElDiaActivo || esHoyDelSistema) FontWeight.Bold else FontWeight.Medium,
+                            color = if (esElDiaActivo) Color.White else if (esHoyDelSistema) colorAzulTEA else Color.DarkGray
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // El contador ahora lee dinámicamente la lista filtrada por el día seleccionado
                 Text(
-                    text = "MIS PASOS AGREGADOS (${pasosSeleccionados.size})",
+                    text = "ACTIVIDADES DEL ${diaFiltroSeleccionado.uppercase()} (${pasosFiltradosPorDia.size})",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Gray
+                    color = Color.DarkGray
                 )
 
                 Button(
@@ -230,14 +302,15 @@ fun CreateRoutineScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // --- LISTADO TOTALMENTE SANEADO POR DÍA ---
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (pasosSeleccionados.isEmpty()) {
+                if (pasosFiltradosPorDia.isEmpty()) {
                     item {
                         Text(
-                            text = "No tienes actividades programadas todavía.\nEscribe arriba el nombre para añadir una.",
+                            text = "No hay actividades para el día ${diaFiltroSeleccionado}.\nUsa el panel superior para registrar tareas.",
                             fontSize = 14.sp,
                             color = Color.Gray,
                             textAlign = TextAlign.Center,
@@ -247,12 +320,19 @@ fun CreateRoutineScreen(
                         )
                     }
                 } else {
-                    itemsIndexed(pasosSeleccionados) { index, paso ->
+                    itemsIndexed(pasosFiltradosPorDia) { indexFiltrado, paso ->
+                        // Buscamos el índice real de la lista completa para eliminar de forma segura en Firebase
+                        val indexRealEnFirebase = pasosSeleccionados.indexOfFirst {
+                            it.actividad == paso.actividad && it.dias == paso.dias
+                        }
+
                         PasoItemCard(
                             tarea = paso,
                             onDeleteClick = {
-                                onRemoveTaskClick(index)
-                                viewModel.saveAll(currentUserId, routineTurn)
+                                if (indexRealEnFirebase != -1) {
+                                    onRemoveTaskClick(indexRealEnFirebase)
+                                    viewModel.saveAll(currentUserId, routineTurn)
+                                }
                             }
                         )
                     }
@@ -278,9 +358,7 @@ fun CreateRoutineScreen(
             }
 
             Button(
-                onClick = {
-                    showSendingDialog = true
-                },
+                onClick = { showSendingDialog = true },
                 modifier = Modifier.weight(1f).height(60.dp),
                 shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = colorAzulTEA)
@@ -357,6 +435,14 @@ fun PasoItemCard(tarea: TaskItem, onDeleteClick: () -> Unit) {
                         fontSize = 12.sp,
                         color = Color.Gray,
                         fontWeight = FontWeight.Medium
+                    )
+                } else {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Días: Todos los días",
+                        fontSize = 12.sp,
+                        color = Color(0xFF4CAF50), // <-- Corregido aquí
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }

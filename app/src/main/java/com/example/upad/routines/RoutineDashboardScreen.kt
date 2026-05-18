@@ -95,7 +95,6 @@ fun RoutineDashboardScreen(
     val currentUser = firebaseAuth.currentUser
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // 🛠️ LEER DIRECTAMENTE DESDE SHAREDPREFERENCES AL INICIAR
     var parentName by remember {
         mutableStateOf(
             context.getSharedPreferences("UPAD_PREFS", android.content.Context.MODE_PRIVATE)
@@ -103,14 +102,12 @@ fun RoutineDashboardScreen(
         )
     }
 
-    // Por si acaso cambia el usuario en caliente, mantenemos el respaldo de Firebase
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             val emailName = currentUser.email?.substringBefore("@")?.uppercase()
             val nameToDisplay = currentUser.displayName?.uppercase() ?: emailName
             if (!nameToDisplay.isNullOrBlank()) {
                 parentName = nameToDisplay
-                // Actualizamos el disco por si acaso
                 context.getSharedPreferences("UPAD_PREFS", android.content.Context.MODE_PRIVATE)
                     .edit().putString("PARENT_NAME", nameToDisplay).apply()
             }
@@ -122,7 +119,6 @@ fun RoutineDashboardScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // --- DETECCIÓN VEHICULAR DEL DÍA ACTUAL DE LA SEMANA ---
     val diasSemana = listOf("LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO", "DOMINGO")
 
     val diaDeHoy = remember {
@@ -131,16 +127,14 @@ fun RoutineDashboardScreen(
         if (diasSemana.contains(formateado)) formateado else "LUNES"
     }
 
-    // Inicializa de forma nativa en el día real en curso
     var diaSeleccionado by remember { mutableStateOf(diaDeHoy) }
     var mostrarCalendarioCompleto by remember { mutableStateOf(false) }
 
-    // Escucha directa de flujos desde la nube
     val allTasksManana by routineViewModel.tasksManana.collectAsState()
     val allTasksTarde by routineViewModel.tasksTarde.collectAsState()
     val allTasksNoche by routineViewModel.tasksNoche.collectAsState()
 
-    // --- FILTRADO ADAPTATIVO POR DÍAS CORREGIDO ---
+    // --- FILTRADO ADAPTATIVO POR DÍAS ---
     val tasksMananaFiltradas = allTasksManana.filter { task ->
         task.dias.any { it.uppercase().startsWith(diaSeleccionado.take(3)) } || task.dias.isEmpty()
     }
@@ -153,26 +147,36 @@ fun RoutineDashboardScreen(
         task.dias.any { it.uppercase().startsWith(diaSeleccionado.take(3)) } || task.dias.isEmpty()
     }
 
+    // --- 🛠️ CLAVE DE FECHA NORMALIZADA PARA EL CONTADOR (LUN, MAR, MIÉ...) ---
+    val prefijoDiaSeleccionado = when (diaSeleccionado) {
+        "MIÉRCOLES", "MIERCOLES" -> "MIÉ"
+        "SÁBADO", "SABADO" -> "SÁB"
+        else -> diaSeleccionado.take(3)
+    }
+
     val routines = listOf(
         RoutineItem(
             name = "MAÑANA",
             icon = Icons.Default.LightMode,
             totalTasks = tasksMananaFiltradas.size,
-            completedTasks = tasksMananaFiltradas.count { it.isCompleted },
+            // 🔥 CORREGIDO ROJO: Usamos la validación por mapa de días
+            completedTasks = tasksMananaFiltradas.count { it.estaCompletadaHoy(prefijoDiaSeleccionado) },
             color = Color(0xFFFFB74D)
         ),
         RoutineItem(
             name = "TARDE",
             icon = Icons.Default.WbTwilight,
             totalTasks = tasksTardeFiltradas.size,
-            completedTasks = tasksTardeFiltradas.count { it.isCompleted },
+            // 🔥 CORREGIDO ROJO: Usamos la validación por mapa de días
+            completedTasks = tasksTardeFiltradas.count { it.estaCompletadaHoy(prefijoDiaSeleccionado) },
             color = Color(0xFF81C784)
         ),
         RoutineItem(
             name = "NOCHE",
             icon = Icons.Default.NightsStay,
             totalTasks = tasksNocheFiltradas.size,
-            completedTasks = tasksNocheFiltradas.count { it.isCompleted },
+            // 🔥 CORREGIDO ROJO: Usamos la validación por mapa de días
+            completedTasks = tasksNocheFiltradas.count { it.estaCompletadaHoy(prefijoDiaSeleccionado) },
             color = Color(0xFF9575CD)
         )
     )

@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,26 +25,41 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.upad.viewmodel.RoutineViewModel
+import java.util.Calendar
 
 @Composable
 fun ActivityDetailsScreen(
-    viewModel: RoutineViewModel, // Inyectamos el ViewModel para leer lo que hace el niño
+    viewModel: RoutineViewModel,
     onBack: () -> Unit
 ) {
     val colorAzulTEA = Color(0xFF4FC3F7)
     val colorFondoBase = Color(0xFFF0F4F8)
 
-    // Forzamos la recarga de las rutinas de la base de datos al abrir la pantalla para asegurar datos frescos
+    // Forzamos la recarga de las rutinas de la base de datos al abrir la pantalla
     LaunchedEffect(Unit) {
         viewModel.cargarRutinasDesdeFirebase("PADRE_TEST")
     }
 
-    // Recolectamos todas las listas de turnos que el padre guardó y el niño ejecuta
+    // --- 📅 DETECTOR AUTOMÁTICO DEL DÍA DE HOY ---
+    val diaActualTexto = remember {
+        when (Calendar.getInstance().get(Calendar.DAY_OF_WEEK)) {
+            Calendar.MONDAY -> "LUN"
+            Calendar.TUESDAY -> "MAR"
+            Calendar.WEDNESDAY -> "MIÉ"
+            Calendar.THURSDAY -> "JUE"
+            Calendar.FRIDAY -> "VIE"
+            Calendar.SATURDAY -> "SÁB"
+            Calendar.SUNDAY -> "DOM"
+            else -> "LUN"
+        }
+    }
+
+    // Recolectamos todas las listas de turnos en tiempo real
     val tasksManana by viewModel.tasksManana.collectAsState()
     val tasksTarde by viewModel.tasksTarde.collectAsState()
     val tasksNoche by viewModel.tasksNoche.collectAsState()
 
-    // Unimos todas las tareas en una sola lista para el reporte global del padre
+    // Unimos todas las tareas en una sola lista para el reporte global
     val todasLasTareas = tasksManana + tasksTarde + tasksNoche
 
     Column(
@@ -97,7 +113,7 @@ fun ActivityDetailsScreen(
             ) {
                 item {
                     Text(
-                        text = "ESTADO DE LA AGENDA VISUAL",
+                        text = "ESTADO DE LA AGENDA HOY (${diaActualTexto})",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Gray,
@@ -105,11 +121,9 @@ fun ActivityDetailsScreen(
                     )
                 }
 
-                // Pintamos de forma dinámica cada actividad registrada en la base de datos
                 items(todasLasTareas) { task ->
-                    // Verificamos si la tarea fue marcada como completada en la app del niño.
-                    // Si el modelo usa otra bandera (ej. un booleano como isCompleted), ajústalo aquí.
-                    val estaCompletada = task.isCompleted
+                    // 🔥 REEMPLAZADO: Usamos la función del modelo basada en el mapa de días
+                    val estaCompletada = task.estaCompletadaHoy(diaActualTexto)
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -124,7 +138,7 @@ fun ActivityDetailsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = task.actividad.uppercase(), // Texto real de Firebase
+                                    text = task.actividad.uppercase(),
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Color.DarkGray,
@@ -167,7 +181,7 @@ fun ActivityDetailsScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Fila dinámica que muestra el estado en texto alternativo con su icono interactivo
+                            // Fila dinámica con icono interactivo
                             DetailRow(
                                 icon = if (estaCompletada) Icons.Default.CheckCircle else Icons.Default.PendingActions,
                                 label = "Estado del paso",

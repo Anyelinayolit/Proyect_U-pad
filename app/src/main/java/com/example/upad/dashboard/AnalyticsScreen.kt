@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.upad.viewmodel.RoutineViewModel
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,10 +44,24 @@ fun AnalyticsScreen(
 
     val diasSemana = listOf("LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO", "DOMINGO")
 
-    // --- 2. CÁLCULO GENERAL DE LA JORNADA ---
-    val completedManana = tasksManana.count { it.isCompleted }
-    val completedTarde = tasksTarde.count { it.isCompleted }
-    val completedNoche = tasksNoche.count { it.isCompleted }
+    // --- 📅 DETECTOR DEL DÍA DE HOY PARA EL RESUMEN SUPERIOR ---
+    val diaActualTexto = remember {
+        when (Calendar.getInstance().get(Calendar.DAY_OF_WEEK)) {
+            Calendar.MONDAY -> "LUN"
+            Calendar.TUESDAY -> "MAR"
+            Calendar.WEDNESDAY -> "MIÉ"
+            Calendar.THURSDAY -> "JUE"
+            Calendar.FRIDAY -> "VIE"
+            Calendar.SATURDAY -> "SÁB"
+            Calendar.SUNDAY -> "DOM"
+            else -> "LUN"
+        }
+    }
+
+    // --- 2. CÁLCULO GENERAL DE LA JORNADA PARA EL DÍA ACTUAL ---
+    val completedManana = tasksManana.count { it.estaCompletadaHoy(diaActualTexto) }
+    val completedTarde = tasksTarde.count { it.estaCompletadaHoy(diaActualTexto) }
+    val completedNoche = tasksNoche.count { it.estaCompletadaHoy(diaActualTexto) }
 
     val totalTasksAsignadas = tasksManana.size + tasksTarde.size + tasksNoche.size
     val totalTasksCompletadas = completedManana + completedTarde + completedNoche
@@ -76,7 +91,7 @@ fun AnalyticsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // --- TARJETA DE RESUMEN DE RENDIMIENTO ---
+            // --- TARJETA DE RESUMEN DE RENDIMIENTO (HOY) ---
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
@@ -88,7 +103,7 @@ fun AnalyticsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Efectividad Semanal", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text("Efectividad de Hoy ($diaActualTexto)", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = if (totalTasksAsignadas > 0) "$generalPercentage% Logrado" else "Sin actividad",
@@ -154,23 +169,27 @@ fun AnalyticsScreen(
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     diasSemana.forEach { dia ->
-                        val prefix = dia.take(3)
+                        // Normalizamos la clave del día actual del bucle a 3 letras estandarizadas (LUN, MAR, MIÉ...)
+                        val prefix = when(dia) {
+                            "MIÉRCOLES" -> "MIÉ"
+                            "SÁBADO" -> "SÁB"
+                            else -> dia.take(3)
+                        }
 
                         // Filtrado de las rutinas según el día analizado
                         val mTasks = tasksManana.filter { it.dias.any { d -> d.uppercase().startsWith(prefix) } || it.dias.isEmpty() }
                         val tTasks = tasksTarde.filter { it.dias.any { d -> d.uppercase().startsWith(prefix) } || it.dias.isEmpty() }
                         val nTasks = tasksNoche.filter { it.dias.any { d -> d.uppercase().startsWith(prefix) } || it.dias.isEmpty() }
 
-                        // Fracción del progreso (0.0f a 1.0f)
-                        val pManana = if (mTasks.isNotEmpty()) mTasks.count { it.isCompleted }.toFloat() / mTasks.size.toFloat() else -1f
-                        val pTarde = if (tTasks.isNotEmpty()) tTasks.count { it.isCompleted }.toFloat() / tTasks.size.toFloat() else -1f
-                        val pNoche = if (nTasks.isNotEmpty()) nTasks.count { it.isCompleted }.toFloat() / nTasks.size.toFloat() else -1f
+                        // 🔥 REEMPLAZADO ROJO: Buscamos cuántas están completas usando el prefijo dinámico del bucle
+                        val pManana = if (mTasks.isNotEmpty()) mTasks.count { it.estaCompletadaHoy(prefix) }.toFloat() / mTasks.size.toFloat() else -1f
+                        val pTarde = if (tTasks.isNotEmpty()) tTasks.count { it.estaCompletadaHoy(prefix) }.toFloat() / tTasks.size.toFloat() else -1f
+                        val pNoche = if (nTasks.isNotEmpty()) nTasks.count { it.estaCompletadaHoy(prefix) }.toFloat() / nTasks.size.toFloat() else -1f
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.Top
                         ) {
-                            // Nombre del día fijo a la izquierda
                             Text(
                                 text = dia.lowercase().replaceFirstChar { it.uppercase() },
                                 modifier = Modifier
@@ -181,7 +200,6 @@ fun AnalyticsScreen(
                                 color = Color.DarkGray
                             )
 
-                            // Contenedor de las 3 barras con soporte para iconos descriptivos
                             Column(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -219,7 +237,6 @@ fun BarChartRow(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Mini pictograma del turno al inicio de la barra
         Icon(
             imageVector = icon,
             contentDescription = null,
@@ -229,7 +246,6 @@ fun BarChartRow(
                 .size(16.dp)
         )
 
-        // Pista de la barra gris/fondo
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -238,7 +254,6 @@ fun BarChartRow(
                 .background(Color(0xFFE0E0E0).copy(alpha = 0.6f))
         ) {
             if (tieneTareas && barraProgresoAnimada > 0f) {
-                // Barra de color real completada
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
@@ -251,7 +266,6 @@ fun BarChartRow(
 
         Spacer(modifier = Modifier.width(10.dp))
 
-        // Texto de porcentaje a la derecha
         Text(
             text = if (tieneTareas) "${(progress * 100).toInt()}%" else "--",
             fontSize = 11.sp,
@@ -272,7 +286,7 @@ fun LegendItem(text: String, color: Color, icon: ImageVector) {
             tint = color,
             modifier = Modifier.size(16.dp)
         )
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(6.6f.dp))
         Text(
             text = text,
             fontSize = 12.sp,

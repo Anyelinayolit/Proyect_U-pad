@@ -15,20 +15,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.upad.viewmodel.RoutineViewModel
-import com.google.firebase.auth.FirebaseAuth // <-- Importamos FirebaseAuth para el ID
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 
 @Composable
 fun TaskExecutionScreen(
     viewModel: RoutineViewModel,
     turn: String,
-    onFinishRoutine: () -> Unit // Nota: Este ya no cerrará la app de golpe
+    onFinishRoutine: () -> Unit
 ) {
     val colorFondoNiño = Color(0xFFE1F5FE)
     val colorVerdeExito = Color(0xFF4CAF50)
     val colorNaranjaEspera = Color(0xFFFFB74D)
 
-    // Obtenemos el ID del usuario actual de Firebase de forma segura
     val currentUserId = remember {
         FirebaseAuth.getInstance().currentUser?.uid ?: "PADRE_TEST"
     }
@@ -42,19 +41,30 @@ fun TaskExecutionScreen(
     var currentTaskIndex by remember { mutableIntStateOf(0) }
     var mostrandoCelebracionIdivual by remember { mutableStateOf(false) }
 
-    // Si el padre agrega actividades nuevas desde el adulto, reiniciamos el índice si es necesario
     LaunchedEffect(tasks.size) {
         if (currentTaskIndex >= tasks.size && tasks.isNotEmpty()) {
-            // Si estábamos en modo descanso y el papá metió más tareas, regresamos a la acción
             currentTaskIndex = 0
         }
     }
 
     if (mostrandoCelebracionIdivual) {
         LaunchedEffect(Unit) {
-            delay(2000) // 2 segundos de estrellitas animadas
+            delay(2000)
             mostrandoCelebracionIdivual = false
-            currentTaskIndex++ // Avanza en el contador
+            currentTaskIndex++
+        }
+    }
+
+    val diaActualTexto = remember {
+        when (java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)) {
+            java.util.Calendar.MONDAY -> "LUN"
+            java.util.Calendar.TUESDAY -> "MAR"
+            java.util.Calendar.WEDNESDAY -> "MIÉ"
+            java.util.Calendar.THURSDAY -> "JUE"
+            java.util.Calendar.FRIDAY -> "VIE"
+            java.util.Calendar.SATURDAY -> "SÁB"
+            java.util.Calendar.SUNDAY -> "DOM"
+            else -> "LUN"
         }
     }
 
@@ -71,7 +81,6 @@ fun TaskExecutionScreen(
                 Text("Buscando tus actividades...", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF01579B))
             }
         }
-        // --- ESTADO 1: ANIMACIÓN INTERMEDIA DE ESTRELLITAS ---
         else if (mostrandoCelebracionIdivual) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -85,7 +94,6 @@ fun TaskExecutionScreen(
                 Text(text = "✨ ¡Eres genial! ✨", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0288D1), textAlign = TextAlign.Center)
             }
         }
-        // --- ESTADO 2: MIENTRAS EL NIÑO TENGA TAREAS EN LA LISTA ---
         else if (currentTaskIndex < tasks.size) {
             val currentTask = tasks[currentTaskIndex]
 
@@ -142,11 +150,16 @@ fun TaskExecutionScreen(
                     color = Color.Gray
                 )
 
-                // --- BOTÓN DE LOGRO CORREGIDO ---
+                // --- 🛠️ BOTÓN DE LOGRO TOTALMENTE REPARADO ---
                 Button(
                     onClick = {
-                        // Enviamos los 3 parámetros correctos incluyendo el ID dinámico del usuario
-                        viewModel.completeTask(currentUserId, turn, currentTaskIndex)
+                        // Cambiamos la función vieja por la inteligente basada en nombre y fecha actual
+                        viewModel.completeTaskPorNombre(
+                            userId = currentUserId,
+                            turn = turn,
+                            actividadTexto = currentTask.actividad,
+                            diaActual = diaActualTexto
+                        )
                         mostrandoCelebracionIdivual = true
                     },
                     modifier = Modifier.fillMaxWidth(0.85f).height(80.dp),
@@ -162,7 +175,6 @@ fun TaskExecutionScreen(
                 }
             }
         }
-        // --- ESTADO 3: SOLUCIÓN AL MODO DESCANSO (ESPERA REACTIVA) ---
         else {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -190,7 +202,7 @@ fun TaskExecutionScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Lo hiciste increíble. Puedes relajarte un momento mientras tu tutor prepara tu siguiente actividad.",
+                    text = "Lo hiciste increíble. Puedes relajarte un momento mientras tu tutor prepara tu siguiente activity.",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color.Gray,
