@@ -144,6 +144,11 @@ fun LoginScreen(
                         auth.signInWithEmailAndPassword(email.trim(), password.trim())
                             .addOnCompleteListener { task ->
                                 if (task.isSuccessful) {
+                                    // 🔥 CORREGIDO: Guardamos el nombre en SharedPreferences antes de disparar la navegación
+                                    val prefs = context.getSharedPreferences("UPAD_PREFS", android.content.Context.MODE_PRIVATE)
+                                    val emailName = email.substringBefore("@").uppercase()
+                                    prefs.edit().putString("PARENT_NAME", emailName).apply()
+
                                     onLoginClick(email, password)
                                 } else {
                                     isLoading = false

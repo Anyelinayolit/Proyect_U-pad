@@ -85,4 +85,6 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
+    //huella digital
+    implementation("androidx.biometric:biometric:1.2.0-alpha05")
 }

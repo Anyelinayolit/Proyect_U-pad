@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun TaskFeedbackScreen(
-    activityName: String = "Bañarse",
+    activityName: String, // ¡Llega directo desde la actividad que el niño acaba de hacer!
     onFeedbackSelected: (String) -> Unit
 ) {
     val colorAzulTEA = Color(0xFF4FC3F7)
@@ -28,7 +28,7 @@ fun TaskFeedbackScreen(
             .fillMaxSize()
             .background(colorFondoBase)
     ) {
-        // --- CABECERA (Igual que las otras pantallas) ---
+        // --- CABECERA DE REFORZAMIENTO ---
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -46,14 +46,16 @@ fun TaskFeedbackScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Sobre la actividad: $activityName",
-                fontSize = 18.sp,
-                color = Color.Gray,
+                // Aquí se pinta en mayúsculas la actividad que llegó del adulto en tiempo real
+                text = "Sobre la actividad: ${activityName.uppercase()}",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.DarkGray,
                 textAlign = TextAlign.Center
             )
         }
 
-        // --- CONTENEDOR DE EMOCIONES ---
+        // --- CONTENEDOR DE EMOCIONES (Diseño limpio de tus compañeros) ---
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -71,7 +73,7 @@ fun TaskFeedbackScreen(
                     modifier = Modifier.weight(1f),
                     emoji = "😊",
                     label = "FELIZ",
-                    color = Color(0xFF81C784), // Verde
+                    color = Color(0xFF81C784), // Verde éxito
                     onClick = { onFeedbackSelected("feliz") }
                 )
                 FeedbackCard(
@@ -85,7 +87,7 @@ fun TaskFeedbackScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Fila para Triste (Ocupa el ancho completo para equilibrio visual)
+            // Fila para Triste
             FeedbackCard(
                 modifier = Modifier.fillMaxWidth(0.6f),
                 emoji = "🙁",
@@ -95,7 +97,7 @@ fun TaskFeedbackScreen(
             )
         }
 
-        // --- ESPACIADOR INFERIOR PARA MANTENER EL ESTILO ---
+        // --- ESPACIADOR INFERIOR SEGURO ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -127,7 +129,7 @@ fun FeedbackCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(text = emoji, fontSize = 50.sp)
+            Text(text = emoji, fontSize = 54.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = label,

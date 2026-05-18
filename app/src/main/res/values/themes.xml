@@ -4,8 +4,8 @@
         <item name="windowSplashScreenAnimatedIcon">@mipmap/quantic_icon_foreground</item>
         <item name="windowSplashScreenAnimationDuration">300</item>
         <item name="windowSplashScreenBackground">@color/white</item>
-        <item name="android:windowSplashScreenBrandingImage">@drawable/logo_quantic</item>
-        <item name="postSplashScreenTheme">@style/Theme.App.Start</item>
+        <item name="postSplashScreenTheme">@style/Theme.UPad</item>
     </style>
+
     <style name="Theme.UPad" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

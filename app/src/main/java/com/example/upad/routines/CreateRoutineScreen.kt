@@ -3,12 +3,13 @@ package com.example.upad.routines
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,28 +22,39 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.upad.viewmodel.TaskItem
+import com.example.upad.viewmodel.RoutineViewModel
+import com.google.firebase.auth.FirebaseAuth // <-- IMPORTANTE: Añadimos el import de FirebaseAuth
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateRoutineScreen(
     routineTurn: String = "Mañana",
-    childName: String = "Mateo",
-    // Agregamos la lista como parámetro para que persista al volver de la otra pantalla
-    pasosSeleccionados: List<TaskItem> = emptyList(),
+    childName: String = "tu hijo",
+    pasosSeleccionados: List<TaskItem>,
     onBackClick: () -> Unit,
     onNavigateToPictogramSearch: () -> Unit,
     onSendRoutine: () -> Unit,
+    onRemoveTaskClick: (Int) -> Unit,
+    viewModel: RoutineViewModel,
     drawableId: Int
 ) {
-    var routineName by remember { mutableStateOf("") }
+    // Obtenemos el userId real de la sesión activa
+    val currentUserId = remember {
+        FirebaseAuth.getInstance().currentUser?.uid ?: "PADRE_TEST"
+    }
+
+    var routineName by remember(routineTurn) { mutableStateOf("Rutina de la $routineTurn") }
     var showSendingDialog by remember { mutableStateOf(false) }
+
+    var nombreActividad by remember { mutableStateOf("") }
+    val diasDeLaSemana = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+    val diasSeleccionados = remember { mutableStateListOf<String>() }
 
     val colorAzulTEA = Color(0xFF4FC3F7)
     val colorAmarilloTEA = Color(0xFFFFD54F)
     val colorFondoBase = Color(0xFFF0F4F8)
 
-    // --- LÓGICA DEL DIÁLOGO ---
     if (showSendingDialog) {
         SendingRoutineDialog(
             routineTurn = routineTurn,
@@ -51,7 +63,10 @@ fun CreateRoutineScreen(
         )
 
         LaunchedEffect(Unit) {
-            delay(3000)
+            // Sincronizamos usando el id del usuario dinámico actual
+            viewModel.saveAll(currentUserId, routineTurn)
+
+            delay(2000)
             showSendingDialog = false
             onSendRoutine()
         }
@@ -81,7 +96,7 @@ fun CreateRoutineScreen(
                 modifier = Modifier.padding(start = 12.dp)
             )
             Text(
-                text = "Nueva Rutina",
+                text = "Editar Actividades",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Black,
                 color = colorAzulTEA,
@@ -96,15 +111,97 @@ fun CreateRoutineScreen(
         ) {
             OutlinedTextField(
                 value = routineName,
-                onValueChange = { routineName = it },
-                label = { Text("Nombre de la Rutina (ej: Día de Escuela)") },
+                onValueChange = {
+                    routineName = it
+                    viewModel.updateName(it)
+                },
+                label = { Text("Nombre de la Rutina") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colorAzulTEA),
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // --- FORMULARIO INTELIGENTE ---
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "NUEVA ACTIVIDAD AUTOMÁTICA",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorAzulTEA
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = nombreActividad,
+                        onValueChange = { nombreActividad = it },
+                        placeholder = { Text("Ej: Estudiar inglés, Lavar los platos...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(text = "Días programados:", fontSize = 13.sp, color = Color.Gray)
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        diasDeLaSemana.forEach { dia ->
+                            val estaSeleccionado = diasSeleccionados.contains(dia)
+                            FilterChip(
+                                selected = estaSeleccionado,
+                                onClick = {
+                                    if (estaSeleccionado) diasSeleccionados.remove(dia)
+                                    else diasSeleccionados.add(dia)
+                                },
+                                label = { Text(dia, fontSize = 11.sp) },
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // --- CORREGIDO: BOTÓN TOTALMENTE COMPATIBLE CON EL NUEVO VIEWMODEL ---
+                    Button(
+                        onClick = {
+                            if (nombreActividad.isNotEmpty()) {
+                                viewModel.agregarActividadAutomatica(
+                                    userId = currentUserId,
+                                    turn = routineTurn,
+                                    textoCompleto = nombreActividad,
+                                    diasSeleccionados = diasSeleccionados.toList()
+                                )
+                                nombreActividad = ""
+                                diasSeleccionados.clear()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = colorAzulTEA)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.6f.dp))
+                        Text("AÑADIR ACTIVIDAD ➕", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -112,60 +209,58 @@ fun CreateRoutineScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "PASOS DE LA RUTINA",
+                    text = "MIS PASOS AGREGADOS (${pasosSeleccionados.size})",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Gray
                 )
 
                 Button(
-                    onClick = { /* IA logic */ },
+                    onClick = { /* IA Logic */ },
                     colors = ButtonDefaults.buttonColors(containerColor = colorAmarilloTEA),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     shape = RoundedCornerShape(12.dp),
                     elevation = ButtonDefaults.buttonElevation(4.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                    Spacer(modifier = Modifier.width(6.6f.dp))
                     Text("Sugerir con IA", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // --- AQUÍ ESTÁ EL CAMBIO: USAMOS LA LISTA DINÁMICA ---
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Si la lista está vacía, podemos mostrar un mensajito o nada
-                items(pasosSeleccionados) { paso ->
-                    PasoItemCard(paso)
-                }
-
-                item {
-                    OutlinedButton(
-                        onClick = onNavigateToPictogramSearch,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(2.dp, colorAzulTEA.copy(alpha = 0.5f))
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = colorAzulTEA)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("AGREGAR PASO", color = colorAzulTEA, fontWeight = FontWeight.Bold)
+                if (pasosSeleccionados.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No tienes actividades programadas todavía.\nEscribe arriba el nombre para añadir una.",
+                            fontSize = 14.sp,
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 30.dp)
+                        )
+                    }
+                } else {
+                    itemsIndexed(pasosSeleccionados) { index, paso ->
+                        PasoItemCard(
+                            tarea = paso,
+                            onDeleteClick = {
+                                onRemoveTaskClick(index)
+                                viewModel.saveAll(currentUserId, routineTurn)
+                            }
+                        )
                     }
                 }
             }
         }
 
-        // --- PANEL DE ACCIÓN INFERIOR ---
+        // --- SECCIÓN DE ACCIONES INFERIORES ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -183,26 +278,21 @@ fun CreateRoutineScreen(
             }
 
             Button(
-                onClick = { showSendingDialog = true },
+                onClick = {
+                    showSendingDialog = true
+                },
                 modifier = Modifier.weight(1f).height(60.dp),
                 shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = colorAzulTEA)
             ) {
-                Text("ENVIAR", fontWeight = FontWeight.Black)
+                Text("GUARDAR RUTINA", fontWeight = FontWeight.Black)
             }
         }
     }
 }
 
-// ... (Los componentes SendingRoutineDialog y PasoItemCard se mantienen igual)
-
-// --- DIÁLOGO PERSONALIZADO ESTILO U-PAD ---
 @Composable
-fun SendingRoutineDialog(
-    routineTurn: String,
-    childName: String,
-    onDismiss: () -> Unit
-) {
+fun SendingRoutineDialog(routineTurn: String, childName: String, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {},
@@ -210,19 +300,13 @@ fun SendingRoutineDialog(
         containerColor = Color.White,
         text = {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 20.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                CircularProgressIndicator(
-                    color = Color(0xFF4FC3F7),
-                    strokeWidth = 5.dp,
-                    modifier = Modifier.size(60.dp)
-                )
+                CircularProgressIndicator(color = Color(0xFF4FC3F7), strokeWidth = 5.dp, modifier = Modifier.size(60.dp))
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Enviando rutina de\n$routineTurn a $childName...",
+                    text = "Guardando cambios en el turno\n$routineTurn...",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Black,
                     color = Color.DarkGray,
@@ -235,7 +319,7 @@ fun SendingRoutineDialog(
 }
 
 @Composable
-fun PasoItemCard(tarea: TaskItem) { // Recibe el objeto tarea
+fun PasoItemCard(tarea: TaskItem, onDeleteClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -247,30 +331,39 @@ fun PasoItemCard(tarea: TaskItem) { // Recibe el objeto tarea
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier
-                    .size(45.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFF0F4F8)),
+                modifier = Modifier.size(50.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFF0F4F8)),
                 contentAlignment = Alignment.Center
             ) {
-                // SI TIENE URL, MUESTRA LA IMAGEN DE ARASAAC
                 if (tarea.imageUrl.isNotEmpty()) {
-                    coil.compose.AsyncImage(
-                        model = tarea.imageUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    coil.compose.AsyncImage(model = tarea.imageUrl, contentDescription = null, modifier = Modifier.fillMaxSize())
                 } else {
                     Icon(Icons.Default.Image, contentDescription = null, tint = Color.LightGray)
                 }
             }
+
             Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = tarea.description, // Muestra el nombre
-                fontWeight = FontWeight.Bold,
-                color = Color.DarkGray,
-                modifier = Modifier.weight(1f)
-            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = tarea.actividad,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.DarkGray,
+                    fontSize = 15.sp
+                )
+                if (tarea.dias.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Días: ${tarea.dias.joinToString(", ")}",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            IconButton(onClick = onDeleteClick) {
+                Icon(imageVector = Icons.Default.Delete, contentDescription = "Eliminar", tint = Color(0xFFEF5350))
+            }
         }
     }
 }
