@@ -109,14 +109,12 @@ fun RoutineDashboardScreen(
         if (diasSemana.contains(formateado)) formateado else "LUNES"
     }
 
-    // El número real de hoy del sistema (ej: 1, 15, 28...)
     val numeroDeHoyReal = remember { Calendar.getInstance().get(Calendar.DAY_OF_MONTH) }
 
     var diaSeleccionado by remember { mutableStateOf(diaDeHoy) }
     var diaNumeroSeleccionado by remember { mutableStateOf(numeroDeHoyReal) }
     var mostrarCalendarioCompleto by remember { mutableStateOf(false) }
 
-    // --- 📅 MOTOR DE CALENDARIO MENSUAL ESTILO GOOGLE CALENDAR ---
     val infoMesActual = remember {
         val cal = Calendar.getInstance()
         val nombreMes = cal.getDisplayName(Calendar.MONTH, Calendar.LONG, Locale("es", "ES"))?.uppercase() ?: ""
@@ -232,8 +230,10 @@ fun RoutineDashboardScreen(
                     selected = false,
                     onClick = {
                         scope.launch { drawerState.close() }
+                        val uid = currentUser?.uid ?: ""
                         if (esPremium) {
-                            routineViewModel.cancelPremium()
+                            // 🔥 Se envía el UID actual para dar de baja el plan en la nube
+                            routineViewModel.cancelPremium(uid)
                         } else {
                             onNavigateToChangePlan()
                         }
@@ -386,7 +386,6 @@ fun RoutineDashboardScreen(
                                         )
                                         .clickable {
                                             diaSeleccionado = dia
-                                            // Si coincide con hoy de forma real, le volvemos a poner su número de hoy, sino ocultamos el número de forma sutil
                                             diaNumeroSeleccionado = if (dia == diaDeHoy) numeroDeHoyReal else -1
                                         }
                                         .padding(horizontal = 18.dp, vertical = 10.dp),
@@ -410,7 +409,6 @@ fun RoutineDashboardScreen(
                     }
                 }
 
-                // --- 🗓️ CALENDARIO INTERACTIVO ESTILO GOOGLE CALENDAR ---
                 item {
                     AnimatedVisibility(visible = mostrarCalendarioCompleto) {
                         Card(
@@ -528,7 +526,6 @@ fun RoutineDashboardScreen(
                     }
                 }
 
-                // --- 🎯 ACTUALIZACIÓN DE ETIQUETA DINÁMICA CON NÚMERO DE DÍA ---
                 item {
                     Text(
                         text = if (diaNumeroSeleccionado > 0) {

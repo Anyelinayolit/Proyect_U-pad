@@ -3,12 +3,15 @@ package com.example.upad.child
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -20,62 +23,79 @@ import com.example.upad.R
 
 @Composable
 fun RoutineCompletedScreen(
-    // 🛠️ CORREGIDO: Ahora el valor por defecto avisa que todo está al día
     nextActivityPreview: String = "¡Felicidades! Completaste todo",
     onFinishClick: () -> Unit
 ) {
-    val colorAzulTEA = Color(0xFF4FC3F7)
-    val colorVerdeTEA = Color(0xFF81C784)
-    val colorFondoBase = Color(0xFFF0F4F8)
+    val colorAzulTEA = Color(0xFF0288D1)     // Azul más vivo y con mejor contraste
+    val colorVerdeExito = Color(0xFF2E7D32)  // Verde sólido de logro cumplido
 
-    // Detectamos si viene el texto por defecto para cambiar los mensajes informativos
+    // ✨ Un degradado mágico, alegre y luminoso digno de una celebración
+    val fondoDegradadoMagico = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFE1F5FE), // Celeste cielo pastel
+            Color(0xFFFFF9C4)  // Oro/Amarillo radiante muy sutil abajo
+        )
+    )
+
     val esFinDeRutina = nextActivityPreview == "¡Felicidades! Completaste todo"
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colorFondoBase)
+            .background(fondoDegradadoMagico)
+            .verticalScroll(rememberScrollState()) // Protege pantallas pequeñas de recortes
     ) {
-        // --- CABECERA DE ÉXITO ---
-        Column(
+        // --- 🏆 CABECERA DE ÉXITO ---
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp))
-                .background(Color.White)
-                .padding(top = 60.dp, bottom = 30.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(bottom = 8.dp),
+            shape = RoundedCornerShape(bottomStart = 45.dp, bottomEnd = 45.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
         ) {
-            Text(
-                text = "¡LO LOGRASTE!",
-                fontSize = 36.sp,
-                fontWeight = FontWeight.Black,
-                color = colorVerdeTEA,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = if (esFinDeRutina) "No tienes tareas pendientes" else "Completaste toda la actividad",
-                fontSize = 18.sp,
-                color = Color.Gray,
-                fontWeight = FontWeight.Medium
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 55.dp, bottom = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "¡LO LOGRASTE! 🎉",
+                    fontSize = 38.sp,
+                    fontWeight = FontWeight.Black,
+                    color = colorVerdeExito,
+                    textAlign = TextAlign.Center,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (esFinDeRutina) "No tienes tareas pendientes" else "Completaste la actividad con éxito",
+                    fontSize = 17.sp,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
 
-        // --- ILUSTRACIÓN DE CELEBRACIÓN ---
+        // --- 🖼️ CONTENEDOR DE LA ILUSTRACIÓN DE CELEBRACIÓN ---
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             contentAlignment = Alignment.Center
         ) {
+            // Contenedor blanco estilizado semi-flotante para que la imagen destaque
             Card(
-                modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(32.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(8.dp)
+                modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+                shape = RoundedCornerShape(36.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
@@ -84,66 +104,86 @@ fun RoutineCompletedScreen(
                         contentDescription = "Celebración",
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(300.dp)
-                            .padding(16.dp),
+                            .height(260.dp)
+                            .padding(8.dp),
                         contentScale = ContentScale.Fit
                     )
                 }
             }
         }
 
-        // --- PANEL DE PRÓXIMA ACTIVIDAD ---
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
-                .background(Color.White)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        // --- 📥 PANEL DE PRÓXIMA ACTIVIDAD DE ALTA VISIBILIDAD ---
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(topStart = 45.dp, topEnd = 45.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
         ) {
-            Text(
-                text = if (esFinDeRutina) "ESTADO DE HOY:" else "PRÓXIMA ACTIVIDAD:",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                letterSpacing = 1.sp
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = nextActivityPreview,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = colorAzulTEA,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = if (esFinDeRutina) "¡Es hora de descansar o jugar! 🎉" else "Rutinas actualizadas",
-                fontSize = 14.sp,
-                color = Color.LightGray,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // BOTÓN SIGUIENTE
-            Button(
-                onClick = onFinishClick,
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = colorAzulTEA),
-                elevation = ButtonDefaults.buttonElevation(6.dp)
+                    .padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "ENTENDIDO ➔",
-                    fontSize = 22.sp,
+                    text = if (esFinDeRutina) "ESTADO DE HOY:" else "SIGUIENTE ACTIVIDAD:",
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Black,
-                    color = Color.White
+                    color = Color.DarkGray,
+                    letterSpacing = 1.5.sp
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Contenedor destacado para el texto dinámico
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F4F8)),
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = nextActivityPreview.uppercase(),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black,
+                        color = colorAzulTEA,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = if (esFinDeRutina) "¡Es hora de descansar o jugar! ⭐" else "¡Sigue así, vas muy bien!",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // 🚀 BOTÓN ENTENDIDO PREMIUM CON EFECTO DE IMPACTO
+                Button(
+                    onClick = onFinishClick,
+                    modifier = Modifier
+                        .fillMaxWidth(0.95f)
+                        .height(72.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), // Cambiado a verde para asociar la acción con avanzar con éxito
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
+                ) {
+                    Text(
+                        text = "¡ENTENDIDO! ➔",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        letterSpacing = 1.sp
+                    )
+                }
             }
         }
     }

@@ -46,16 +46,30 @@ class RoutineViewModel(
         }
     }
 
-    // Cambiar de plan (Premium -> Básico o viceversa)
-    fun setSuscripcionManual(activarPremium: Boolean) {
+    // 🔥 Cambiar de plan sincronizando localmente (DataStore) y en la nube (Firebase Realtime Database)
+    fun setSuscripcionManual(activarPremium: Boolean, userId: String? = null) {
         viewModelScope.launch {
             dataStoreManager.setPremiumStatus(activarPremium)
             _isPremiumManual.value = activarPremium
+
+            if (!userId.isNullOrEmpty()) {
+                try {
+                    com.google.firebase.database.FirebaseDatabase
+                        .getInstance("https://u-pad-1f4a7-default-rtdb.firebaseio.com/")
+                        .reference
+                        .child("usuarios")
+                        .child(userId)
+                        .child("isPremium")
+                        .setValue(activarPremium)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
     }
 
-    fun purchasePremium() { setSuscripcionManual(true) }
-    fun cancelPremium() { setSuscripcionManual(false) }
+    fun purchasePremium(userId: String? = null) { setSuscripcionManual(true, userId) }
+    fun cancelPremium(userId: String? = null) { setSuscripcionManual(false, userId) }
 
     private val _isDarkMode = MutableStateFlow(false)
     val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
@@ -111,7 +125,6 @@ class RoutineViewModel(
         val newTask = TaskItem(
             actividad = actividadTexto.uppercase(),
             imageUrl = imageUrl,
-            // Agregamos por defecto todos los días de la semana para que se rendericen en el Dashboard
             dias = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
         )
         val turnoUpper = turn.uppercase()
@@ -122,7 +135,6 @@ class RoutineViewModel(
             "NOCHE" -> _tasksNoche.value = _tasksNoche.value + newTask
         }
 
-        // 🔥 Mandamos la nueva lista a Firebase inmediatamente después de añadirla
         saveAll(userId, turnoUpper)
     }
 
@@ -209,10 +221,8 @@ class RoutineViewModel(
         }
     }
 
-    // ✨ LOGICA DE AGREGADO CON IA TOTALMENTE LIMPIA Y CORREGIDA
     fun agregarActividadAutomatica(userId: String, turn: String, textoCompleto: String, diasSeleccionados: List<String>) {
         val turnoUpper = turn.uppercase()
-        // Buscamos pictograma basado en la primera palabra generada
         val palabraClave = textoCompleto.trim().split(" ").firstOrNull() ?: "rutina"
 
         viewModelScope.launch {
@@ -233,12 +243,10 @@ class RoutineViewModel(
                 actividad = textoCompleto.uppercase(),
                 palabraClave = palabraClave.uppercase(),
                 imageUrl = urlImagenFinal,
-                // Guardamos los días tal cual ("Lun", "Mar") para que coincidan exactamente con tu interfaz Compose
                 dias = diasSeleccionados.map { it.trim() },
                 estadosPorDia = mapaInicialEstados
             )
 
-            // Actualizamos el flujo mutable de StateFlow para obligar a recomponer la vista de inmediato
             when (turnoUpper) {
                 "MAÑANA" -> _tasksManana.value = _tasksManana.value + nuevaTarea
                 "TARDE" -> _tasksTarde.value = _tasksTarde.value + nuevaTarea
