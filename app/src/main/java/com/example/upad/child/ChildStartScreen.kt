@@ -1,20 +1,26 @@
 package com.example.upad.child
 
 import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -44,6 +50,9 @@ fun ChildStartScreen(
     var cargando by remember { mutableStateOf(true) }
     var padreIdAsociado by remember { mutableStateOf("") }
 
+    // 🎯 Estado local para forzar el modo Premium en la pantalla del niño si el padre lo es
+    var esPremiumPorPadre by remember { mutableStateOf(false) }
+
     val database = remember { FirebaseDatabase.getInstance().reference }
 
     // --- 📡 ESCUCHA CONSTANTE EN TIEMPO REAL DESDE LA NUBE ---
@@ -57,7 +66,16 @@ fun ChildStartScreen(
                         estaVinculado = true
 
                         routineViewModel.cargarRutinasDesdeFirebase(pId)
-                        cargando = false
+
+                        // 🔍 ESCUCHA PREMIUM: Buscamos si el padre es premium en la base de datos
+                        database.child("usuarios").child(pId).child("isPremium")
+                            .addValueEventListener(object : ValueEventListener {
+                                override fun onDataChange(userSnapshot: DataSnapshot) {
+                                    esPremiumPorPadre = userSnapshot.getValue(Boolean::class.java) ?: false
+                                    cargando = false
+                                }
+                                override fun onCancelled(error: DatabaseError) { cargando = false }
+                            })
                     } else {
                         val nuevoCodigo = (100000..999999).random().toString()
                         codigoNiño = nuevoCodigo
@@ -83,7 +101,16 @@ fun ChildStartScreen(
                                             padreIdAsociado = padreId
                                             estaVinculado = true
                                             routineViewModel.cargarRutinasDesdeFirebase(padreId)
-                                            cargando = false
+
+                                            // 🔍 ESCUCHA PREMIUM (Al vincular por primera vez)
+                                            database.child("usuarios").child(padreId).child("isPremium")
+                                                .addValueEventListener(object : ValueEventListener {
+                                                    override fun onDataChange(userSnapshot: DataSnapshot) {
+                                                        esPremiumPorPadre = userSnapshot.getValue(Boolean::class.java) ?: false
+                                                        cargando = false
+                                                    }
+                                                    override fun onCancelled(error: DatabaseError) { cargando = false }
+                                                })
                                         } else {
                                             cargando = false
                                         }
@@ -102,10 +129,61 @@ fun ChildStartScreen(
     val tasksTarde by routineViewModel.tasksTarde.collectAsState()
     val tasksNoche by routineViewModel.tasksNoche.collectAsState()
 
+    // --- CÁLCULO DE FILTROS DIARIOS ---
+    val calendar = Calendar.getInstance()
+    val numeroDia = calendar.get(Calendar.DAY_OF_WEEK)
+    val horaActual = calendar.get(Calendar.HOUR_OF_DAY)
+
+    val diaActualTexto = when (numeroDia) {
+        Calendar.MONDAY -> "LUN"
+        Calendar.TUESDAY -> "MAR"
+        Calendar.WEDNESDAY -> "MIÉ"
+        Calendar.THURSDAY -> "JUE"
+        Calendar.FRIDAY -> "VIE"
+        Calendar.SATURDAY -> "SÁB"
+        Calendar.SUNDAY -> "DOM"
+        else -> "LUN"
+    }
+
+    val listaVariacionesDia = when (numeroDia) {
+        Calendar.MONDAY -> listOf("LUN", "LUNES")
+        Calendar.TUESDAY -> listOf("MAR", "MARTES")
+        Calendar.WEDNESDAY -> listOf("MIÉ", "MIERCOLES", "MIÉRCOLES")
+        Calendar.THURSDAY -> listOf("JUE", "JUEVES")
+        Calendar.FRIDAY -> listOf("VIE", "VIERNES")
+        Calendar.SATURDAY -> listOf("SÁB", "SABADO", "SÁBADO")
+        Calendar.SUNDAY -> listOf("DOM", "DOMINGO")
+        else -> emptyList()
+    }
+
+    val mañanaFiltradas = tasksManana.filter { t -> t.dias.isEmpty() || t.dias.any { d -> listaVariacionesDia.contains(d.uppercase().trim()) } }
+    val tardeFiltradas = tasksTarde.filter { t -> t.dias.isEmpty() || t.dias.any { d -> listaVariacionesDia.contains(d.uppercase().trim()) } }
+    val nocheFiltradas = tasksNoche.filter { t -> t.dias.isEmpty() || t.dias.any { d -> listaVariacionesDia.contains(d.uppercase().trim()) } }
+
+    val pendientesManana = mañanaFiltradas.count { !it.estaCompletadaHoy(diaActualTexto) }
+    val pendientesTarde = tardeFiltradas.count { !it.estaCompletadaHoy(diaActualTexto) }
+    val pendientesNoche = nocheFiltradas.count { !it.estaCompletadaHoy(diaActualTexto) }
+
+    val ejecutarEnrutadorAutomatico = {
+        if (padreIdAsociado.isNotEmpty()) {
+            routineViewModel.cargarRutinasDesdeFirebase(padreIdAsociado)
+        }
+        val primeraMananaPendiente = mañanaFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
+        val primeraTardePendiente = tardeFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
+        val primeraNochePendiente = nocheFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
+
+        when {
+            primeraMananaPendiente != null -> onNavigateToTask(primeraMananaPendiente.actividad, "MAÑANA")
+            primeraTardePendiente != null -> onNavigateToTask(primeraTardePendiente.actividad, "TARDE")
+            primeraNochePendiente != null -> onNavigateToTask(primeraNochePendiente.actividad, "NOCHE")
+            else -> onNavigateToCompleted()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colorFondoNiño),
+            .background(if (esPremiumPorPadre) Brush.verticalGradient(listOf(Color(0xFFE8F5E9), Color(0xFFC8E6C9))) else Brush.verticalGradient(listOf(colorFondoNiño, colorFondoNiño))),
         contentAlignment = Alignment.Center
     ) {
         if (cargando) {
@@ -113,9 +191,14 @@ fun ChildStartScreen(
         } else {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(32.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.Center
             ) {
                 if (!estaVinculado) {
+                    // --- PANTALLA DE VINCULACIÓN ---
                     Text(
                         text = "¡Hola! Dile a tus papás que escriban este código en su teléfono:",
                         fontSize = 24.sp,
@@ -144,96 +227,178 @@ fun ChildStartScreen(
                     Text("Esperando a conectar...", color = Color.Gray, fontSize = 15.sp)
 
                 } else {
-                    Text(
-                        text = "¡Todo listo para empezar tus actividades!",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF004D40),
-                        textAlign = TextAlign.Center
-                    )
+                    if (esPremiumPorPadre) {
+                        // ✨ MODO PREMIUM: Dashboard Gamificado Visual interactivo
+                        val saludoEmotivo = when {
+                            horaActual in 6..12 -> "¡Buenos días, Campeón! ☀️"
+                            horaActual in 13..18 -> "¡Buenas tardes! ¡A por todas! 🌤️"
+                            else -> "¡Buenas noches, hora de descansar! 🌙"
+                        }
 
-                    Spacer(modifier = Modifier.height(40.dp))
+                        Text(
+                            text = saludoEmotivo,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF1B5E20),
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "Presiona un bloque para ver tus misiones de hoy",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF4E342E),
+                            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+                        )
 
-                    Button(
-                        onClick = {
-                            if (padreIdAsociado.isNotEmpty()) {
-                                routineViewModel.cargarRutinasDesdeFirebase(padreIdAsociado)
-                            }
-
-                            val calendar = Calendar.getInstance()
-                            val numeroDia = calendar.get(Calendar.DAY_OF_WEEK)
-
-                            val diaActualTexto = when (numeroDia) {
-                                Calendar.MONDAY -> "LUN"
-                                Calendar.TUESDAY -> "MAR"
-                                Calendar.WEDNESDAY -> "MIÉ"
-                                Calendar.THURSDAY -> "JUE"
-                                Calendar.FRIDAY -> "VIE"
-                                Calendar.SATURDAY -> "SÁB"
-                                Calendar.SUNDAY -> "DOM"
-                                else -> "LUN"
-                            }
-
-                            val listaVariacionesDia = when (numeroDia) {
-                                Calendar.MONDAY -> listOf("LUN", "LUNES")
-                                Calendar.TUESDAY -> listOf("MAR", "MARTES")
-                                Calendar.WEDNESDAY -> listOf("MIÉ", "MIERCOLES", "MIÉRCOLES")
-                                Calendar.THURSDAY -> listOf("JUE", "JUEVES")
-                                Calendar.FRIDAY -> listOf("VIE", "VIERNES")
-                                Calendar.SATURDAY -> listOf("SÁB", "SABADO", "SÁBADO")
-                                Calendar.SUNDAY -> listOf("DOM", "DOMINGO")
-                                else -> emptyList()
-                            }
-
-                            val mañanaFiltradas = tasksManana.filter { tarea ->
-                                if (tarea.dias.isEmpty()) true else {
-                                    tarea.dias.any { d -> listaVariacionesDia.contains(d.uppercase().trim()) }
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            ChildBlockPremiumCard(
+                                titulo = "RUTINA DE LA MAÑANA",
+                                pendientes = pendientesManana,
+                                total = mañanaFiltradas.size,
+                                icono = Icons.Default.LightMode,
+                                colorBase = Color(0xFFFFB74D),
+                                onClick = {
+                                    val primera = mañanaFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
+                                    if (primera != null) onNavigateToTask(primera.actividad, "MAÑANA") else ejecutarEnrutadorAutomatico()
                                 }
-                            }
+                            )
 
-                            val tardeFiltradas = tasksTarde.filter { tarea ->
-                                if (tarea.dias.isEmpty()) true else {
-                                    tarea.dias.any { d -> listaVariacionesDia.contains(d.uppercase().trim()) }
+                            ChildBlockPremiumCard(
+                                titulo = "RUTINA DE LA TARDE",
+                                pendientes = pendientesTarde,
+                                total = tardeFiltradas.size,
+                                icono = Icons.Default.WbTwilight,
+                                colorBase = Color(0xFF81C784),
+                                onClick = {
+                                    val primera = tardeFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
+                                    if (primera != null) onNavigateToTask(primera.actividad, "TARDE") else ejecutarEnrutadorAutomatico()
                                 }
-                            }
+                            )
 
-                            val nocheFiltradas = tasksNoche.filter { tarea ->
-                                if (tarea.dias.isEmpty()) true else {
-                                    tarea.dias.any { d -> listaVariacionesDia.contains(d.uppercase().trim()) }
+                            ChildBlockPremiumCard(
+                                titulo = "RUTINA DE LA NOCHE",
+                                pendientes = pendientesNoche,
+                                total = nocheFiltradas.size,
+                                icono = Icons.Default.NightsStay,
+                                colorBase = Color(0xFF9575CD),
+                                onClick = {
+                                    val primera = nocheFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
+                                    if (primera != null) onNavigateToTask(primera.actividad, "NOCHE") else ejecutarEnrutadorAutomatico()
                                 }
-                            }
+                            )
+                        }
 
-                            // 🔍 Filtro estricto: Trae únicamente el primer objeto que no reporte completado hoy
-                            val primeraMananaPendiente = mañanaFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
-                            val primeraTardePendiente = tardeFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
-                            val primeraNochePendiente = nocheFiltradas.firstOrNull { !it.estaCompletadaHoy(diaActualTexto) }
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                            // 🗺️ ENRUTADOR DINÁMICO RE-EVALUADO
-                            when {
-                                primeraMananaPendiente != null -> {
-                                    onNavigateToTask(primeraMananaPendiente.actividad, "MAÑANA")
-                                }
-                                primeraTardePendiente != null -> {
-                                    onNavigateToTask(primeraTardePendiente.actividad, "TARDE")
-                                }
-                                primeraNochePendiente != null -> {
-                                    onNavigateToTask(primeraNochePendiente.actividad, "NOCHE")
-                                }
-                                else -> {
-                                    onNavigateToCompleted()
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth(0.75f)
-                            .height(80.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                        shape = RoundedCornerShape(24.dp),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
-                    ) {
-                        Text("VER MIS TAREAS 🚀", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Button(
+                            onClick = { ejecutarEnrutadorAutomatico() },
+                            modifier = Modifier.fillMaxWidth(0.85f).height(65.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                            shape = RoundedCornerShape(20.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
+                        ) {
+                            Text("MISIONES AUTOMÁTICAS 🚀", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White)
+                        }
+
+                    } else {
+                        // 🎒 MODO BÁSICO: Interfaz estándar minimalista con el botón único original
+                        Text(
+                            text = "¡Todo listo para empezar tus actividades!",
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF004D40),
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(48.dp))
+
+                        Button(
+                            onClick = { ejecutarEnrutadorAutomatico() },
+                            modifier = Modifier
+                                .fillMaxWidth(0.85f)
+                                .height(85.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                            shape = RoundedCornerShape(24.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+                        ) {
+                            Text("VER MIS TAREAS 🚀", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChildBlockPremiumCard(
+    titulo: String,
+    pendientes: Int,
+    total: Int,
+    icono: ImageVector,
+    colorBase: Color,
+    onClick: () -> Unit
+) {
+    val completadas = total - pendientes
+    val estaTodoListo = total > 0 && pendientes == 0
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        border = BorderStroke(2.dp, if (estaTodoListo) Color(0xFF4CAF50) else colorBase.copy(alpha = 0.3f))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(colorBase.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(imageVector = icono, contentDescription = null, tint = colorBase, modifier = Modifier.size(32.dp))
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = titulo,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF263238)
+                    )
+                    Text(
+                        text = if (total == 0) "Sin tareas para hoy" else if (estaTodoListo) "¡Bloque completado! 🎉" else "$completadas de $total hechas",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (estaTodoListo) Color(0xFF388E3C) else Color.Gray
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(if (estaTodoListo) Color(0xFFE8F5E9) else colorBase),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (estaTodoListo) "✅" else "$pendientes",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Black,
+                    color = if (estaTodoListo) Color(0xFF388E3C) else Color.White
+                )
             }
         }
     }

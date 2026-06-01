@@ -28,8 +28,12 @@ fun ProfileScreen(
     onNavigateBack: () -> Unit,
     onLogoutSuccess: () -> Unit
 ) {
-    val colorAzulTEA = Color(0xFF4FC3F7)
-    val colorFondoBase = Color(0xFFF0F4F8)
+    // 🔄 CONEXIÓN GLOBAL: Extraemos la paleta reactiva de Material 3
+    val colorAcabadoPrincipal = MaterialTheme.colorScheme.primary
+    val colorFondoBase = MaterialTheme.colorScheme.background
+    val colorSuperficieTarjetas = MaterialTheme.colorScheme.surface
+    val colorTextoPrincipal = MaterialTheme.colorScheme.onBackground
+    val colorTextoSecundario = MaterialTheme.colorScheme.onSurface
 
     val firebaseAuth = remember { FirebaseAuth.getInstance() }
     val currentUser = firebaseAuth.currentUser
@@ -44,13 +48,13 @@ fun ProfileScreen(
         containerColor = colorFondoBase,
         topBar = {
             TopAppBar(
-                title = { Text("Mi Perfil", fontWeight = FontWeight.Bold, color = Color.DarkGray) },
+                title = { Text("Mi Perfil", fontWeight = FontWeight.Bold, color = colorTextoPrincipal) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = colorAzulTEA)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = colorAcabadoPrincipal)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = colorSuperficieTarjetas)
             )
         }
     ) { paddingValues ->
@@ -63,30 +67,45 @@ fun ProfileScreen(
         ) {
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Avatar Circular de perfil
+            // Avatar Circular de perfil adaptable
             Box(
                 modifier = Modifier
                     .size(100.dp)
                     .clip(CircleShape)
-                    .background(colorAzulTEA.copy(alpha = 0.2f)),
+                    .background(colorAcabadoPrincipal.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Person, contentDescription = null, tint = colorAzulTEA, modifier = Modifier.size(50.dp))
+                Icon(Icons.Default.Person, contentDescription = null, tint = colorAcabadoPrincipal, modifier = Modifier.size(50.dp))
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Tarjeta contenedora de Información básica del usuario
+            // Tarjeta contenedora de Información básica del usuario adaptable
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                colors = CardDefaults.cardColors(containerColor = colorSuperficieTarjetas),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, colorTextoSecundario.copy(alpha = 0.12f))
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    ProfileInfoRow(icon = Icons.Default.Person, title = "Nombre de Usuario", value = parentName, iconColor = colorAzulTEA)
+                    ProfileInfoRow(
+                        icon = Icons.Default.Person,
+                        title = "Nombre de Usuario",
+                        value = parentName,
+                        iconColor = colorAcabadoPrincipal,
+                        textColor = colorTextoPrincipal,
+                        subTextColor = colorTextoSecundario
+                    )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = colorFondoBase)
-                    ProfileInfoRow(icon = Icons.Default.Email, title = "Correo Electrónico", value = currentUser?.email ?: "No disponible", iconColor = colorAzulTEA)
+                    ProfileInfoRow(
+                        icon = Icons.Default.Email,
+                        title = "Correo Electrónico",
+                        value = currentUser?.email ?: "No disponible",
+                        iconColor = colorAcabadoPrincipal,
+                        textColor = colorTextoPrincipal,
+                        subTextColor = colorTextoSecundario
+                    )
                 }
             }
 
@@ -101,7 +120,7 @@ fun ProfileScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)), // Color rojo de alerta fijo intencional
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color.White)
@@ -113,7 +132,14 @@ fun ProfileScreen(
 }
 
 @Composable
-fun ProfileInfoRow(icon: ImageVector, title: String, value: String, iconColor: Color) {
+fun ProfileInfoRow(
+    icon: ImageVector,
+    title: String,
+    value: String,
+    iconColor: Color,
+    textColor: Color,
+    subTextColor: Color
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -121,8 +147,8 @@ fun ProfileInfoRow(icon: ImageVector, title: String, value: String, iconColor: C
         Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(16.dp))
         Column {
-            Text(text = title, fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
-            Text(text = value, fontSize = 16.sp, color = Color.DarkGray, fontWeight = FontWeight.Bold)
+            Text(text = title, fontSize = 12.sp, color = subTextColor, fontWeight = FontWeight.Medium)
+            Text(text = value, fontSize = 16.sp, color = textColor, fontWeight = FontWeight.Bold)
         }
     }
 }

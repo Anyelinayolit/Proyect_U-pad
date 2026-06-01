@@ -87,4 +87,15 @@ dependencies {
     implementation(libs.googleid)
     //huella digital
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
+    // Dependencias necesarias para DataStore Preferences
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.datastore:datastore-preferences-core:1.1.1")
+    // 🚨 ESTA ES LA LÍNEA CRUCIAL PARA MATERIAL 3:
+    implementation("androidx.compose.material3:material3:1.2.1")
+
+    // También asegúrate de tener las dependencias base de Compose actualizadas
+    implementation("androidx.compose.ui:ui:1.6.7")
+    implementation("androidx.compose.material:material-icons-extended:1.6.7")
+// 🤖 SDK de Firebase Vertex AI para usar Gemini 2.5
+    implementation("com.google.firebase:firebase-vertexai:16.0.0-beta01")
 }

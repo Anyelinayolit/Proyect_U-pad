@@ -8,12 +8,17 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowInsetsControllerCompat
@@ -51,15 +56,16 @@ import com.example.upad.setup.ExperienceSetupScreen
 import com.example.upad.setup.SubscriptionPlansScreen
 import com.example.upad.setup.TrialDisclaimerScreen
 import com.example.upad.setup.TutorialsScreen
+import com.example.upad.setup.ChangePlanScreen
 import com.example.upad.dashboard.ProfileScreen
 import com.example.upad.dashboard.SettingsScreen
 import com.example.upad.viewmodel.RoutineViewModel
 import com.example.upad.dashboard.ConnectionScreen
 import com.example.upad.dashboard.AnalyticsScreen
+import com.example.upad.premium.PaymentViewScreen // Única importación premium externa necesaria
 
 class MainActivity : FragmentActivity() {
 
-    // Escucha remota de Firebase
     private var ordenBloqueoPadreActiva by mutableStateOf(false)
     private val database = FirebaseDatabase.getInstance().reference
 
@@ -81,20 +87,28 @@ class MainActivity : FragmentActivity() {
             })
 
         setContent {
-            UPadNavigation(ordenBloqueoPadreActiva, ::gestionarRestriccionesSistema)
+            val repository = remember { FirebaseRepository() }
+            val routineViewModel: RoutineViewModel = viewModel(
+                factory = com.example.upad.viewmodel.RoutineViewModelFactory(repository)
+            )
+
+            val isDarkMode by routineViewModel.isDarkMode.collectAsState()
+            val isPremiumUser by routineViewModel.isUserPremium.collectAsState(initial = false)
+
+            UPadTheme(darkTheme = isDarkMode, isPremium = isPremiumUser) {
+                UPadNavigation(
+                    bloqueoActivo = ordenBloqueoPadreActiva,
+                    routineViewModel = routineViewModel,
+                    onCambiarEstadoSistema = ::gestionarRestriccionesSistema
+                )
+            }
         }
     }
 
-    /**
-     * Esta es la clave: Oculta la HORA, BATERÍA y BOTONES de salir,
-     * pero NO bloquea los contenidos visuales de la app.
-     */
     private fun gestionarRestriccionesSistema(activarFijacionKiosco: Boolean) {
         if (activarFijacionKiosco) {
-            // Impedir que la pantalla se suspenda mientras el niño hace su rutina bajo supervisión
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-            // 🚫 DESAPARECE LA HORA, NOTIFICACIONES Y BATERÍA (Status Bar) + BOTONES DE ABAJO (Navigation Bar)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 window.insetsController?.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
             } else {
@@ -106,10 +120,8 @@ class MainActivity : FragmentActivity() {
                         )
             }
 
-            // 🔒 ANCLAJE DE HARDWARE: Bloquea los gestos y botones físicos para que no pueda salirse de la app
             try { startLockTask() } catch (e: Exception) { e.printStackTrace() }
         } else {
-            // Regresa todo a la normalidad cuando el padre lo libera
             try {
                 stopLockTask()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -125,39 +137,68 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
+fun UPadTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    isPremium: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    val colorAcabadoPrincipal = if (isPremium) Color(0xFFC5A059) else Color(0xFF4FC3F7)
+
+    val colorScheme = if (darkTheme) {
+        darkColorScheme(
+            primary = colorAcabadoPrincipal,
+            background = Color(0xFF121212),
+            surface = Color(0xFF1E1E1E),
+            onBackground = Color.White,
+            onSurface = Color(0xFFE0E0E0)
+        )
+    } else {
+        lightColorScheme(
+            primary = colorAcabadoPrincipal,
+            background = Color(0xFFF0F4F8),
+            surface = Color.White,
+            onBackground = Color(0xFF212121),
+            onSurface = Color(0xFF757575)
+        )
+    }
+
+    MaterialTheme(
+        colorScheme = colorScheme,
+        content = content
+    )
+}
+
+@Composable
 fun UPadNavigation(
     bloqueoActivo: Boolean,
+    routineViewModel: RoutineViewModel,
     onCambiarEstadoSistema: (Boolean) -> Unit
 ) {
     val navController = rememberNavController()
-    val repository = remember { FirebaseRepository() }
-    val routineViewModel: RoutineViewModel = viewModel(
-        factory = com.example.upad.viewmodel.RoutineViewModelFactory(repository)
-    )
+    val isDarkMode by routineViewModel.isDarkMode.collectAsState()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val rutaActual = navBackStackEntry?.destination?.route ?: ""
 
-    // Detectamos si está interactuando en las pantallas del menor
     val estaEnSeccionNiño = rutaActual.startsWith("child_")
 
-    // Aplicamos el aislamiento del sistema de forma reactiva
     LaunchedEffect(bloqueoActivo, estaEnSeccionNiño) {
         if (bloqueoActivo && estaEnSeccionNiño) {
-            onCambiarEstadoSistema(true)  // Quita hora, batería y congela salidas
+            onCambiarEstadoSistema(true)
         } else {
-            onCambiarEstadoSistema(false) // Muestra todo normal
+            onCambiarEstadoSistema(false)
         }
     }
 
-    // Comportamiento de barras transparentes para las secciones del padre o login
     val view = LocalView.current
     if (!view.isInEditMode && !(bloqueoActivo && estaEnSeccionNiño)) {
         val activity = view.context as Activity
         val window = activity.window
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
+
+        window.statusBarColor = if (isDarkMode) android.graphics.Color.parseColor("#1E1E1E") else android.graphics.Color.TRANSPARENT
+
         val windowInsetsController = WindowInsetsControllerCompat(window, window.decorView)
-        windowInsetsController.isAppearanceLightStatusBars = true
+        windowInsetsController.isAppearanceLightStatusBars = !isDarkMode
     }
 
     Scaffold(
@@ -168,9 +209,6 @@ fun UPadNavigation(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // 🛠️ ¡CAMBIO CLAVE AQUÍ!: Eliminamos la pantalla azul intrusiva.
-            // Ahora el NavHost SIGUE CORRIENDO SIEMPRE. Las rutinas del niño no se interrumpen.
-            // Lo único que cambia es que, a nivel de sistema, el dispositivo se "ciega" y se congela el entorno.
             NavHost(
                 navController = navController,
                 startDestination = "role_selection"
@@ -265,7 +303,6 @@ fun UPadNavigation(
 
                 composable("device_pairing") {
                     DevicePairingScreen(
-                        onDeviceSelected = { navController.navigate("tutorials") },
                         onNavigateToDashboard = { navController.navigate("parent_dashboard") }
                     )
                 }
@@ -277,6 +314,26 @@ fun UPadNavigation(
                     )
                 }
 
+                // --- SECCIÓN PREMIUM FLUJO DE PAGOS (LIMPIO) ---
+                composable("change_plan") {
+                    ChangePlanScreen(
+                        onBackClick = { navController.popBackStack() },
+                        onNavigateToPayment = { navController.navigate("payment_view") }
+                    )
+                }
+
+                composable("payment_view") {
+                    PaymentViewScreen(
+                        routineViewModel = routineViewModel,
+                        onPaymentConfirmed = {
+                            routineViewModel.setSuscripcionManual(true)
+                            navController.navigate("parent_dashboard") {
+                                popUpTo("parent_dashboard") { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
                 // --- SECCIÓN PADRE (DASHBOARD Y RUTINAS) ---
                 composable("parent_dashboard") {
                     LaunchedEffect(Unit) {
@@ -284,17 +341,14 @@ fun UPadNavigation(
                     }
                     RoutineDashboardScreen(
                         routineViewModel = routineViewModel,
-                        onNavigateToCreateRoutine = { turn ->
-                            navController.navigate("create_routine/$turn")
-                        },
-                        onRoutineClick = { turn ->
-                            navController.navigate("create_routine/$turn")
-                        },
+                        onNavigateToCreateRoutine = { turn -> navController.navigate("create_routine/$turn") },
+                        onRoutineClick = { turn -> navController.navigate("create_routine/$turn") },
                         onNavigateToProfile = { navController.navigate("profile") },
                         onNavigateToSettings = { navController.navigate("settings") },
                         onNavigateToConnection = { navController.navigate("connection_code") },
                         onNavigateToAnalytics = { navController.navigate("analytics") },
-                        onNavigateToDeviceManagement = { navController.navigate("device_management") }
+                        onNavigateToDeviceManagement = { navController.navigate("device_management") },
+                        onNavigateToChangePlan = { navController.navigate("change_plan") }
                     )
                 }
 
@@ -311,6 +365,7 @@ fun UPadNavigation(
 
                 composable("settings") {
                     SettingsScreen(
+                        routineViewModel = routineViewModel,
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }
@@ -323,17 +378,16 @@ fun UPadNavigation(
                 }
 
                 composable("analytics") {
-                    LaunchedEffect(Unit) {
-                        routineViewModel.cargarRutinasDesdeFirebase("PADRE_TEST")
-                    }
                     AnalyticsScreen(
                         routineViewModel = routineViewModel,
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToPremium = { navController.navigate("subscription_plans") }
                     )
                 }
 
                 composable("device_management") {
                     DeviceManagementScreen(
+                        routineViewModel = routineViewModel,
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }
@@ -376,13 +430,14 @@ fun UPadNavigation(
                         viewModel = routineViewModel,
                         onBackClick = { navController.popBackStack() },
                         onPictogramSelected = { description, url ->
-                            routineViewModel.addTask(turn, description, url)
+                            // Modificado para asegurar persistencia instantánea
+                            routineViewModel.addTask(turn, description, url, "PADRE_TEST")
                             navController.popBackStack()
                         }
                     )
                 }
 
-                // --- SECCIÓN NIÑO ---
+                // --- SECCIÓN NIÑO (PANTALLA ÚNICA COMPARTIDA Y CORREGIDA) ---
                 composable("child_start") {
                     ChildStartScreen(
                         routineViewModel = routineViewModel,

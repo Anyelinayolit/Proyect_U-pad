@@ -1,20 +1,10 @@
 package com.example.upad.dashboard
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -27,34 +17,15 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Lock // 👈 IMPORTADO PARA EL ICONO DE BLOQUEO
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WbTwilight
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -88,14 +60,23 @@ fun RoutineDashboardScreen(
     onNavigateToSettings: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
     onNavigateToConnection: () -> Unit = {},
-    onNavigateToDeviceManagement: () -> Unit = {} // 🔥 PASO 3: NUEVA PROP PARA ENLAZAR LA PANTALLA
+    onNavigateToDeviceManagement: () -> Unit = {},
+    onNavigateToChangePlan: () -> Unit = {}
 ) {
-    val colorAzulTEA = Color(0xFF4FC3F7)
-    val colorFondoBase = Color(0xFFF0F4F8)
+    val colorAcabadoPrincipal = MaterialTheme.colorScheme.primary
+    val colorFondoBase = MaterialTheme.colorScheme.background
+    val colorSuperficieTarjetas = MaterialTheme.colorScheme.surface
+    val colorTextoPrincipal = MaterialTheme.colorScheme.onBackground
+    val colorTextoSecundario = MaterialTheme.colorScheme.onSurface
 
     val firebaseAuth = remember { FirebaseAuth.getInstance() }
     val currentUser = firebaseAuth.currentUser
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    val esPremium by routineViewModel.isUserPremium.collectAsState()
+    val isDarkMode by routineViewModel.isDarkMode.collectAsState()
+
+    val colorDinamicoSuscripcion = if (esPremium) Color(0xFFC5A059) else colorAcabadoPrincipal
 
     var parentName by remember {
         mutableStateOf(
@@ -117,7 +98,6 @@ fun RoutineDashboardScreen(
     }
 
     val childText = "tu hijo"
-
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -129,31 +109,60 @@ fun RoutineDashboardScreen(
         if (diasSemana.contains(formateado)) formateado else "LUNES"
     }
 
+    // El número real de hoy del sistema (ej: 1, 15, 28...)
+    val numeroDeHoyReal = remember { Calendar.getInstance().get(Calendar.DAY_OF_MONTH) }
+
     var diaSeleccionado by remember { mutableStateOf(diaDeHoy) }
+    var diaNumeroSeleccionado by remember { mutableStateOf(numeroDeHoyReal) }
     var mostrarCalendarioCompleto by remember { mutableStateOf(false) }
+
+    // --- 📅 MOTOR DE CALENDARIO MENSUAL ESTILO GOOGLE CALENDAR ---
+    val infoMesActual = remember {
+        val cal = Calendar.getInstance()
+        val nombreMes = cal.getDisplayName(Calendar.MONTH, Calendar.LONG, Locale("es", "ES"))?.uppercase() ?: ""
+        val anio = cal.get(Calendar.YEAR)
+        val maxDias = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+
+        val listaDiasDelMes = (1..maxDias).map { dia ->
+            val tempCal = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, dia) }
+            val nombreDiaAsignado = when (tempCal.get(Calendar.DAY_OF_WEEK)) {
+                Calendar.MONDAY -> "LUNES"
+                Calendar.TUESDAY -> "MARTES"
+                Calendar.WEDNESDAY -> "MIÉRCOLES"
+                Calendar.THURSDAY -> "JUEVES"
+                Calendar.FRIDAY -> "VIERNES"
+                Calendar.SATURDAY -> "SÁBADO"
+                Calendar.SUNDAY -> "DOMINGO"
+                else -> "LUNES"
+            }
+            Pair(dia, nombreDiaAsignado)
+        }
+        Triple("$nombreMes $anio", maxDias, listaDiasDelMes)
+    }
+
+    val tituloMes = infoMesActual.first
+    val diasDelMesArray = infoMesActual.third
 
     val allTasksManana by routineViewModel.tasksManana.collectAsState()
     val allTasksTarde by routineViewModel.tasksTarde.collectAsState()
     val allTasksNoche by routineViewModel.tasksNoche.collectAsState()
 
-    // --- FILTRADO ADAPTATIVO POR DÍAS ---
-    val tasksMananaFiltradas = allTasksManana.filter { task ->
-        task.dias.any { it.uppercase().startsWith(diaSeleccionado.take(3)) } || task.dias.isEmpty()
-    }
-
-    val tasksTardeFiltradas = allTasksTarde.filter { task ->
-        task.dias.any { it.uppercase().startsWith(diaSeleccionado.take(3)) } || task.dias.isEmpty()
-    }
-
-    val tasksNocheFiltradas = allTasksNoche.filter { task ->
-        task.dias.any { it.uppercase().startsWith(diaSeleccionado.take(3)) } || task.dias.isEmpty()
-    }
-
-    // --- CLAVE DE FECHA NORMALIZADA PARA EL CONTADOR (LUN, MAR, MIÉ...) ---
     val prefijoDiaSeleccionado = when (diaSeleccionado) {
         "MIÉRCOLES", "MIERCOLES" -> "MIÉ"
         "SÁBADO", "SABADO" -> "SÁB"
         else -> diaSeleccionado.take(3)
+    }
+
+    val tasksMananaFiltradas = allTasksManana.filter { task ->
+        task.dias.isEmpty() || task.dias.any { it.uppercase().trim().startsWith(prefijoDiaSeleccionado.uppercase()) }
+    }
+
+    val tasksTardeFiltradas = allTasksTarde.filter { task ->
+        task.dias.isEmpty() || task.dias.any { it.uppercase().trim().startsWith(prefijoDiaSeleccionado.uppercase()) }
+    }
+
+    val tasksNocheFiltradas = allTasksNoche.filter { task ->
+        task.dias.isEmpty() || task.dias.any { it.uppercase().trim().startsWith(prefijoDiaSeleccionado.uppercase()) }
     }
 
     val routines = listOf(
@@ -184,13 +193,13 @@ fun RoutineDashboardScreen(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = Color.White,
+                drawerContainerColor = colorSuperficieTarjetas,
                 modifier = Modifier.width(300.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(colorAzulTEA)
+                        .background(colorDinamicoSuscripcion)
                         .padding(24.dp)
                 ) {
                     Column {
@@ -206,45 +215,76 @@ fun RoutineDashboardScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+
+                val drawerColors = NavigationDrawerItemDefaults.colors(
+                    unselectedIconColor = colorTextoSecundario,
+                    unselectedTextColor = colorTextoPrincipal
+                )
+
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Analytics, contentDescription = null, tint = colorAzulTEA) },
-                    label = { Text("Análisis de Desempeño", fontWeight = FontWeight.Medium) },
+                    icon = { Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700)) },
+                    label = {
+                        Text(
+                            text = if (esPremium) "Cambiar a Plan Básico" else "Cambiar a Plan Premium",
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
                     selected = false,
-                    onClick = { scope.launch { drawerState.close() }; onNavigateToAnalytics() },
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        if (esPremium) {
+                            routineViewModel.cancelPremium()
+                        } else {
+                            onNavigateToChangePlan()
+                        }
+                    },
+                    colors = drawerColors,
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
 
-                // 🔥 PASO 3 INTERNO: ADICIÓN DEL BOTÓN EN EL MENÚ DESPLEGABLE
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Lock, contentDescription = null, tint = colorAzulTEA) },
+                    icon = { Icon(Icons.Default.Analytics, contentDescription = null) },
+                    label = { Text("Análisis de Desempeño", fontWeight = FontWeight.Medium) },
+                    selected = false,
+                    onClick = { scope.launch { drawerState.close() }; onNavigateToAnalytics() },
+                    colors = drawerColors,
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Lock, contentDescription = null) },
                     label = { Text("Bloquear Dispositivo", fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = {
                         scope.launch { drawerState.close() }
-                        onNavigateToDeviceManagement() // Ejecuta el salto de pantalla
+                        onNavigateToDeviceManagement()
                     },
+                    colors = drawerColors,
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
 
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Link, contentDescription = null, tint = colorAzulTEA) },
+                    icon = { Icon(Icons.Default.Link, contentDescription = null) },
                     label = { Text("Conectar con el Niño (Código)", fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onNavigateToConnection() },
+                    colors = drawerColors,
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Person, contentDescription = null, tint = colorAzulTEA) },
+                    icon = { Icon(Icons.Default.Person, contentDescription = null) },
                     label = { Text("Mi Perfil", fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onNavigateToProfile() },
+                    colors = drawerColors,
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = colorAzulTEA) },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                     label = { Text("Ajustes", fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onNavigateToSettings() },
+                    colors = drawerColors,
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
             }
@@ -255,8 +295,8 @@ fun RoutineDashboardScreen(
             floatingActionButton = {
                 FloatingActionButton(
                     onClick = { onNavigateToCreateRoutine(diaSeleccionado) },
-                    containerColor = colorAzulTEA,
-                    contentColor = Color.White,
+                    containerColor = colorDinamicoSuscripcion,
+                    contentColor = if (esPremium && !isDarkMode) Color.Black else Color.White,
                     shape = CircleShape
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = "Crear nueva rutina", modifier = Modifier.size(30.dp))
@@ -275,18 +315,24 @@ fun RoutineDashboardScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(bottomStart = 45.dp, bottomEnd = 45.dp))
-                            .background(Color.White)
+                            .background(colorSuperficieTarjetas)
                             .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 24.dp)
                     ) {
                         IconButton(
                             onClick = { scope.launch { drawerState.open() } },
                             modifier = Modifier.align(Alignment.Start)
                         ) {
-                            Icon(Icons.Default.Menu, contentDescription = "Abrir menú", tint = colorAzulTEA, modifier = Modifier.size(28.dp))
+                            Icon(Icons.Default.Menu, contentDescription = "Abrir menú", tint = colorDinamicoSuscripcion, modifier = Modifier.size(28.dp))
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "¡HOLA, $parentName!", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.LightGray)
-                        Text(text = "Rutinas de $childText", fontSize = 28.sp, fontWeight = FontWeight.Black, color = colorAzulTEA)
+                        Text(text = "¡HOLA, $parentName!", fontSize = 14.sp, fontWeight = FontWeight.Black, color = colorTextoSecundario.copy(alpha = 0.6f))
+
+                        Text(
+                            text = if (esPremium) "Rutinas de $childText ⭐" else "Rutinas de $childText",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Black,
+                            color = colorDinamicoSuscripcion
+                        )
                     }
                 }
 
@@ -300,20 +346,24 @@ fun RoutineDashboardScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = if (diaSeleccionado == diaDeHoy) "PROGRAMA DE HOY ($diaDeHoy)" else "PROGRAMA DEL $diaSeleccionado",
+                                text = if (diaSeleccionado == diaDeHoy && diaNumeroSeleccionado == numeroDeHoyReal) {
+                                    "PROGRAMA DE HOY ($diaDeHoy $numeroDeHoyReal)"
+                                } else {
+                                    "PROGRAMA DEL $diaSeleccionado" + if (diaNumeroSeleccionado > 0) " $diaNumeroSeleccionado" else ""
+                                },
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Black,
-                                color = if (diaSeleccionado == diaDeHoy) colorAzulTEA else Color.Gray
+                                color = if (diaSeleccionado == diaDeHoy && diaNumeroSeleccionado == numeroDeHoyReal) colorDinamicoSuscripcion else colorTextoSecundario
                             )
 
                             IconButton(
                                 onClick = { mostrarCalendarioCompleto = !mostrarCalendarioCompleto },
-                                modifier = Modifier.background(if (mostrarCalendarioCompleto) colorAzulTEA.copy(alpha = 0.15f) else Color.Transparent, CircleShape)
+                                modifier = Modifier.background(if (mostrarCalendarioCompleto) colorDinamicoSuscripcion.copy(alpha = 0.15f) else Color.Transparent, CircleShape)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.CalendarMonth,
                                     contentDescription = "Planificar otros días",
-                                    tint = if (mostrarCalendarioCompleto) Color(0xFF0288D1) else colorAzulTEA
+                                    tint = colorDinamicoSuscripcion
                                 )
                             }
                         }
@@ -330,17 +380,27 @@ fun RoutineDashboardScreen(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(16.dp))
                                         .background(
-                                            if (esElSeleccionado) colorAzulTEA
-                                            else if (esHoyReal) colorAzulTEA.copy(alpha = 0.1f)
-                                            else Color.White
+                                            if (esElSeleccionado) colorDinamicoSuscripcion
+                                            else if (esHoyReal) colorDinamicoSuscripcion.copy(alpha = 0.15f)
+                                            else colorSuperficieTarjetas
                                         )
-                                        .clickable { diaSeleccionado = dia }
+                                        .clickable {
+                                            diaSeleccionado = dia
+                                            // Si coincide con hoy de forma real, le volvemos a poner su número de hoy, sino ocultamos el número de forma sutil
+                                            diaNumeroSeleccionado = if (dia == diaDeHoy) numeroDeHoyReal else -1
+                                        }
                                         .padding(horizontal = 18.dp, vertical = 10.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = dia,
-                                        color = if (esElSeleccionado) Color.White else if (esHoyReal) colorAzulTEA else Color.DarkGray,
+                                        color = if (esElSeleccionado) {
+                                            if (esPremium && !isDarkMode) Color.Black else Color.White
+                                        } else if (esHoyReal) {
+                                            colorDinamicoSuscripcion
+                                        } else {
+                                            colorTextoPrincipal
+                                        },
                                         fontWeight = if (esElSeleccionado || esHoyReal) FontWeight.Black else FontWeight.Bold,
                                         fontSize = 13.sp
                                     )
@@ -350,6 +410,7 @@ fun RoutineDashboardScreen(
                     }
                 }
 
+                // --- 🗓️ CALENDARIO INTERACTIVO ESTILO GOOGLE CALENDAR ---
                 item {
                     AnimatedVisibility(visible = mostrarCalendarioCompleto) {
                         Card(
@@ -357,29 +418,109 @@ fun RoutineDashboardScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 20.dp, vertical = 4.dp),
                             shape = RoundedCornerShape(24.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            colors = CardDefaults.cardColors(containerColor = colorSuperficieTarjetas),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, colorTextoSecundario.copy(alpha = 0.12f))
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
-                                Text(text = "PLANIFICACIÓN SEMANAL COMPLETA", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-                                Row(modifier = Modifier.fillMaxWidth().background(colorFondoBase, RoundedCornerShape(8.dp)).padding(6.dp)) {
-                                    Text("Día", modifier = Modifier.weight(1.2f), fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                    Text("Mañana", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 11.sp, textAlign = TextAlign.Center)
-                                    Text("Tarde", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 11.sp, textAlign = TextAlign.Center)
-                                    Text("Noche", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 11.sp, textAlign = TextAlign.Center)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = tituloMes,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = colorDinamicoSuscripcion,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                    Text(
+                                        text = "VISTA MENSUAL",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colorTextoSecundario.copy(alpha = 0.6f)
+                                    )
                                 }
-                                diasSemana.forEach { dia ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { diaSeleccionado = dia; mostrarCalendarioCompleto = false }
-                                            .padding(vertical = 8.dp, horizontal = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(text = dia.take(3) + ".", modifier = Modifier.weight(1.2f), fontWeight = if (dia == diaSeleccionado) FontWeight.Black else FontWeight.Normal, color = if (dia == diaSeleccionado) Color(0xFF0288D1) else Color.DarkGray, fontSize = 13.sp)
-                                        Text("☀️", modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 12.sp)
-                                        Text("🌤️", modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 12.sp)
-                                        Text("🌙", modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 12.sp)
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    val inicialesDias = listOf("D", "L", "M", "M", "J", "V", "S")
+                                    inicialesDias.forEach { letra ->
+                                        Text(
+                                            text = letra,
+                                            modifier = Modifier.weight(1f),
+                                            textAlign = TextAlign.Center,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = colorTextoSecundario.copy(alpha = 0.5f)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                val calendarAux = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1) }
+                                val espacioVacioInicial = calendarAux.get(Calendar.DAY_OF_WEEK) - 1
+
+                                var diaProcesadoIndex = 0
+                                val totalCeldasNecesarias = espacioVacioInicial + diasDelMesArray.size
+                                val filasDeSemanas = (totalCeldasNecesarias + 6) / 7
+
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    for (semana in 0 until filasDeSemanas) {
+                                        Row(modifier = Modifier.fillMaxWidth()) {
+                                            for (diaSemanaFila in 0 until 7) {
+                                                val posicionCelda = semana * 7 + diaSemanaFila
+
+                                                if (posicionCelda < espacioVacioInicial || diaProcesadoIndex >= diasDelMesArray.size) {
+                                                    Spacer(modifier = Modifier.weight(1f))
+                                                } else {
+                                                    val datosDelDia = diasDelMesArray[diaProcesadoIndex]
+                                                    val numeroDia = datosDelDia.first
+                                                    val nombreDiaCompleto = datosDelDia.second
+
+                                                    val esElSeleccionadoHoy = numeroDia == diaNumeroSeleccionado
+                                                    val esDiaActualDelMes = numeroDia == numeroDeHoyReal
+
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .aspectRatio(1f)
+                                                            .clip(CircleShape)
+                                                            .background(
+                                                                when {
+                                                                    esElSeleccionadoHoy -> colorDinamicoSuscripcion
+                                                                    esDiaActualDelMes -> colorDinamicoSuscripcion.copy(alpha = 0.15f)
+                                                                    else -> Color.Transparent
+                                                                }
+                                                            )
+                                                            .clickable {
+                                                                diaSeleccionado = nombreDiaCompleto
+                                                                diaNumeroSeleccionado = numeroDia
+                                                                mostrarCalendarioCompleto = false
+                                                            },
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = numeroDia.toString(),
+                                                            fontSize = 13.sp,
+                                                            fontWeight = if (esElSeleccionadoHoy || esDiaActualDelMes) FontWeight.Black else FontWeight.Medium,
+                                                            color = when {
+                                                                esElSeleccionadoHoy -> if (esPremium && !isDarkMode) Color.Black else Color.White
+                                                                esDiaActualDelMes -> colorDinamicoSuscripcion
+                                                                else -> colorTextoPrincipal
+                                                            }
+                                                        )
+                                                    }
+                                                    diaProcesadoIndex++
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -387,12 +528,17 @@ fun RoutineDashboardScreen(
                     }
                 }
 
+                // --- 🎯 ACTUALIZACIÓN DE ETIQUETA DINÁMICA CON NÚMERO DE DÍA ---
                 item {
                     Text(
-                        text = "BLOQUES DE ACTIVIDAD - $diaSeleccionado",
+                        text = if (diaNumeroSeleccionado > 0) {
+                            "BLOQUES DE ACTIVIDAD - $diaSeleccionado $diaNumeroSeleccionado"
+                        } else {
+                            "BLOQUES DE ACTIVIDAD - $diaSeleccionado"
+                        },
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
+                        color = colorTextoSecundario,
                         modifier = Modifier.padding(start = 24.dp, top = 8.dp, end = 24.dp)
                     )
                 }
@@ -401,6 +547,9 @@ fun RoutineDashboardScreen(
                     Box(modifier = Modifier.padding(horizontal = 20.dp)) {
                         RoutineProgressCard(
                             routine = routine,
+                            colorSuperficie = colorSuperficieTarjetas,
+                            colorTexto = colorTextoPrincipal,
+                            colorTextoSec = colorTextoSecundario,
                             onClick = { onRoutineClick(routine.name) }
                         )
                     }
@@ -413,6 +562,9 @@ fun RoutineDashboardScreen(
 @Composable
 fun RoutineProgressCard(
     routine: RoutineItem,
+    colorSuperficie: Color,
+    colorTexto: Color,
+    colorTextoSec: Color,
     onClick: () -> Unit
 ) {
     val progress = if (routine.totalTasks > 0) routine.completedTasks.toFloat() / routine.totalTasks.toFloat() else 0f
@@ -422,8 +574,9 @@ fun RoutineProgressCard(
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = colorSuperficie),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, colorTextoSec.copy(alpha = 0.08f))
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -443,8 +596,8 @@ fun RoutineProgressCard(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text(text = routine.name, fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.DarkGray)
-                        Text(text = "${routine.completedTasks} de ${routine.totalTasks} tareas", fontSize = 14.sp, color = Color.Gray)
+                        Text(text = routine.name, fontSize = 18.sp, fontWeight = FontWeight.Black, color = colorTexto)
+                        Text(text = "${routine.completedTasks} de ${routine.totalTasks} tareas", fontSize = 14.sp, color = colorTextoSec)
                     }
                 }
                 Text(text = "${(progress * 100).toInt()}%", fontSize = 16.sp, fontWeight = FontWeight.Black, color = routine.color)

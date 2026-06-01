@@ -1,9 +1,14 @@
 package com.example.upad.setup
 
+import android.content.Context
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable // Importación nativa de Compose
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.VolumeUp
@@ -13,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -22,167 +29,235 @@ fun ExperienceSetupScreen(
     onBackClick: () -> Unit,
     onNextClick: () -> Unit
 ) {
-    // Estados que controlan la funcionalidad
-    var selectedTheme by remember { mutableStateOf("Modo claro") }
-    var audioVolume by remember { mutableFloatStateOf(0.7f) }
-    var voiceEnabled by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val prefs = remember { context.getSharedPreferences("UPAD_PREFS", Context.MODE_PRIVATE) }
 
+    val pantallaPequeña = configuration.screenHeightDp < 650
+
+    // --- CARGA DE ESTADOS CON PERSISTENCIA ---
+    var selectedTheme by remember { mutableStateOf(prefs.getString("APP_THEME", "Modo claro") ?: "Modo claro") }
+    var audioVolume by remember { mutableFloatStateOf(prefs.getFloat("AUDIO_VOLUME", 0.7f)) }
+    var voiceEnabled by remember { mutableStateOf(prefs.getBoolean("VOICE_ENABLED", true)) }
+
+    // --- LÓGICA DE DETECCIÓN DINÁMICA DE MODO OSCURO ---
+    val esOscuroActivo = when (selectedTheme) {
+        "Modo oscuro" -> true
+        "Modo claro" -> false
+        else -> isSystemInDarkTheme() // "Según sistema"
+    }
+
+    // --- PALETA DE COLORES ADAPTATIVA (REACTIVA AL MODO OSCURO/CLARO) ---
     val colorAzulTEA = Color(0xFF4FC3F7)
-    val colorFondoBase = Color(0xFFF0F4F8)
+
+    // Transiciones fluidas de color para una mejor experiencia visual
+    val colorFondoBase by animateColorAsState(if (esOscuroActivo) Color(0xFF0F172A) else Color(0xFFF8FAFC))
+    val colorContenedorBlanco by animateColorAsState(if (esOscuroActivo) Color(0xFF1E293B) else Color.White)
+    val colorTextoPrincipal by animateColorAsState(if (esOscuroActivo) Color.White else Color(0xFF1E293B))
+    val colorTextoSecundario by animateColorAsState(if (esOscuroActivo) Color(0xFF94A3B8) else Color.Gray)
+    val colorSuperficieSeleccionada by animateColorAsState(if (esOscuroActivo) Color(0xFF334155) else Color(0xFFE0F7FA))
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(colorFondoBase)
     ) {
-        // --- CABECERA CURVA (Estilo Mateo) ---
+        // --- CABECERA DINÁMICA ---
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 45.dp, bottomEnd = 45.dp))
-                .background(Color.White)
-                .padding(top = 40.dp, bottom = 30.dp, start = 16.dp, end = 24.dp)
+                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                .background(colorContenedorBlanco)
+                .padding(
+                    top = if (pantallaPequeña) 30.dp else 40.dp,
+                    bottom = if (pantallaPequeña) 16.dp else 24.dp,
+                    start = 16.dp,
+                    end = 24.dp
+                )
         ) {
             IconButton(onClick = onBackClick) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = colorAzulTEA)
             }
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "PERSONALIZACIÓN",
-                fontSize = 14.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Black,
-                color = Color.LightGray,
-                modifier = Modifier.padding(start = 12.dp)
+                color = colorTextoSecundario,
+                modifier = Modifier.padding(start = 12.dp),
+                letterSpacing = 1.5.sp
             )
             Text(
                 text = "Prepara la experiencia",
-                fontSize = 28.sp,
+                fontSize = if (pantallaPequeña) 24.sp else 28.sp,
                 fontWeight = FontWeight.Black,
                 color = colorAzulTEA,
                 modifier = Modifier.padding(horizontal = 12.dp)
             )
         }
 
-        // --- CUERPO SCROLLABLE ---
+        // --- CUERPO RESPONSIVO CON SCROLL ---
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(24.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.Top
         ) {
+            Spacer(modifier = Modifier.height(20.dp))
+
             Text(
                 text = "APARIENCIA VISUAL",
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray
+                color = colorAzulTEA,
+                letterSpacing = 1.sp
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Selector de Temas
-            val themes = listOf("Modo oscuro", "Modo claro", "Según sistema")
-            themes.forEach { theme ->
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable { selectedTheme = theme }, // Clickable nativo directo
-                    color = if (selectedTheme == theme) Color.White else Color.Transparent,
-                    tonalElevation = if (selectedTheme == theme) 4.dp else 0.dp
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        RadioButton(
-                            selected = (theme == selectedTheme),
-                            onClick = { selectedTheme = theme },
-                            colors = RadioButtonDefaults.colors(selectedColor = colorAzulTEA)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = theme,
-                            fontSize = 16.sp,
-                            color = if (selectedTheme == theme) colorAzulTEA else Color.DarkGray,
-                            fontWeight = if (selectedTheme == theme) FontWeight.Bold else FontWeight.Medium
-                        )
+            // Selector de Temas Estilizado y Reactivo
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = colorContenedorBlanco),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    val themes = listOf("Modo claro", "Modo oscuro", "Según sistema")
+                    themes.forEach { theme ->
+                        val estaSeleccionado = selectedTheme == theme
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (estaSeleccionado) colorSuperficieSeleccionada else Color.Transparent)
+                                .clickable { selectedTheme = theme }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            RadioButton(
+                                selected = estaSeleccionado,
+                                onClick = { selectedTheme = theme },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = colorAzulTEA,
+                                    unselectedColor = colorTextoSecundario
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = theme,
+                                fontSize = 15.sp,
+                                color = if (estaSeleccionado) colorAzulTEA else colorTextoPrincipal,
+                                fontWeight = if (estaSeleccionado) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             Text(
-                text = "AUDIO Y VOZ (PANTALLA NIÑO)",
-                fontSize = 13.sp,
+                text = "AUDIO Y VOZ (ENTORNO DEL NIÑO)",
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray
+                color = colorAzulTEA,
+                letterSpacing = 1.sp
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Switch de Lectura
+            // Tarjeta de Moduladores de Sonido/Voz
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = colorContenedorBlanco),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Voz en pictogramas", fontWeight = FontWeight.Bold)
-                        Text("Lee las tareas en voz alta", fontSize = 12.sp, color = Color.Gray)
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Voz en pictogramas", fontWeight = FontWeight.Bold, color = colorTextoPrincipal)
+                            Text("Lee las tareas en voz alta", fontSize = 12.sp, color = colorTextoSecundario)
+                        }
+                        Switch(
+                            checked = voiceEnabled,
+                            onCheckedChange = { voiceEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = colorAzulTEA,
+                                uncheckedTrackColor = colorTextoSecundario.copy(alpha = 0.3f)
+                            )
+                        )
                     }
-                    Switch(
-                        checked = voiceEnabled,
-                        onCheckedChange = { voiceEnabled = it },
-                        colors = SwitchDefaults.colors(checkedTrackColor = colorAzulTEA)
-                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = colorTextoSecundario.copy(alpha = 0.15f))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Slider de Volumen
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.VolumeUp,
+                            contentDescription = null,
+                            tint = if (voiceEnabled) colorAzulTEA else colorTextoSecundario
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Slider(
+                            value = audioVolume,
+                            onValueChange = { audioVolume = it },
+                            enabled = voiceEnabled, // Se deshabilita si la voz está apagada
+                            modifier = Modifier.weight(1f),
+                            colors = SliderDefaults.colors(
+                                thumbColor = colorAzulTEA,
+                                activeTrackColor = colorAzulTEA,
+                                inactiveTrackColor = colorAzulTEA.copy(alpha = 0.24f),
+                                disabledThumbColor = colorTextoSecundario.copy(alpha = 0.5f),
+                                disabledActiveTrackColor = colorTextoSecundario.copy(alpha = 0.3f)
+                            )
+                        )
+                    }
                 }
             }
-
             Spacer(modifier = Modifier.height(20.dp))
-
-            // Slider de Volumen
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            ) {
-                Icon(Icons.Default.VolumeUp, contentDescription = null, tint = colorAzulTEA)
-                Slider(
-                    value = audioVolume,
-                    onValueChange = { audioVolume = it },
-                    modifier = Modifier.padding(start = 16.dp),
-                    colors = SliderDefaults.colors(
-                        thumbColor = colorAzulTEA,
-                        activeTrackColor = colorAzulTEA,
-                        inactiveTrackColor = colorAzulTEA.copy(alpha = 0.24f)
-                    )
-                )
-            }
         }
 
-        // --- BOTÓN FINAL ---
-        Column(
+        // --- BOTÓN DE CONTROL FIJO INFERIOR ---
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 45.dp, topEnd = 45.dp))
-                .background(Color.White)
-                .padding(30.dp)
+                .background(colorContenedorBlanco)
+                .padding(horizontal = 20.dp, vertical = if (pantallaPequeña) 12.dp else 16.dp)
         ) {
             Button(
-                onClick = onNextClick,
+                onClick = {
+                    // Guardamos todas las preferencias del entorno seleccionadas localmente
+                    prefs.edit().apply {
+                        putString("APP_THEME", selectedTheme)
+                        putFloat("AUDIO_VOLUME", audioVolume)
+                        putBoolean("VOICE_ENABLED", voiceEnabled)
+                        apply()
+                    }
+                    onNextClick()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp),
-                shape = RoundedCornerShape(22.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = colorAzulTEA)
+                    .height(if (pantallaPequeña) 54.dp else 60.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = colorAzulTEA),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
-                Text("GUARDAR Y CONTINUAR", fontSize = 18.sp, fontWeight = FontWeight.Black)
+                Text("GUARDAR Y CONTINUAR", fontSize = 16.sp, fontWeight = FontWeight.Black)
             }
         }
     }

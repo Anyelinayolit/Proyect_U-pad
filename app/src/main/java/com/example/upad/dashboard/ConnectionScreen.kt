@@ -1,16 +1,21 @@
 package com.example.upad.dashboard
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.PhonelinkRing
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -21,27 +26,31 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 
-// Modelo de datos local para listar los dispositivos enlazados
-data class DispositivoVinculado(val id: String, val modelo: String = "Tablet/Celular Niño")
+data class DispositivoVinculado(val id: String, val modelo: String = "Dispositivo del Niño")
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConnectionScreen(
     onNavigateBack: () -> Unit,
     onLinkSuccess: () -> Unit
 ) {
-    val colorAzulPadre = Color(0xFF0288D1)
-    val colorFondo = Color(0xFFF5F5F5)
-    val colorVerdeExito = Color(0xFF4CAF50)
+    // 🔄 CONEXIÓN GLOBAL: Extraemos la paleta reactiva de Material 3 exactamente como en tu Perfil
+    val colorAcabadoPrincipal = MaterialTheme.colorScheme.primary
+    val colorFondoBase = MaterialTheme.colorScheme.background
+    val colorSuperficieTarjetas = MaterialTheme.colorScheme.surface
+    val colorTextoPrincipal = MaterialTheme.colorScheme.onBackground
+    val colorTextoSecundario = MaterialTheme.colorScheme.onSurface
+
+    // Colores de estado fijos que combinan bien en ambos modos
+    val colorVerdePremium = Color(0xFF2E7D32)
+    val colorRojoSuave = Color(0xFFEF5350)
 
     val idPadrePrueba = "PADRE_TEST"
-
     var codigoIngresado by remember { mutableStateOf("") }
     var cargandoVerificacion by remember { mutableStateOf(true) }
     var mensajeError by remember { mutableStateOf("") }
 
-    // Lista dinámica para guardar todos los dispositivos enlazados a este padre
     val listaDispositivos = remember { mutableStateListOf<DispositivoVinculado>() }
-
     val database = remember { FirebaseDatabase.getInstance().reference }
 
     // --- ESCUCHAR MULTIDISPOSITIVOS EN TIEMPO REAL ---
@@ -52,192 +61,282 @@ fun ConnectionScreen(
                     listaDispositivos.clear()
                     for (dispositivo in snapshot.children) {
                         val padreIdEnBD = dispositivo.child("padreId").getValue(String::class.java)
-                        // Si el dispositivo le pertenece a este padre, lo metemos a la lista
                         if (padreIdEnBD == idPadrePrueba) {
-                            listaDispositivos.add(
-                                DispositivoVinculado(
-                                    id = dispositivo.key ?: ""
-                                )
-                            )
+                            listaDispositivos.add(DispositivoVinculado(id = dispositivo.key ?: ""))
                         }
                     }
                     cargandoVerificacion = false
                 }
-
                 override fun onCancelled(error: DatabaseError) {
                     cargandoVerificacion = false
                 }
             })
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colorFondo),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        if (cargandoVerificacion) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = colorAzulPadre)
-            }
-        } else {
-            LazyColumn(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // --- SECCIÓN 1: TÍTULO PRINCIPAL ---
-                item {
-                    Spacer(modifier = Modifier.height(20.dp))
+    Scaffold(
+        containerColor = colorFondoBase,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
                     Text(
-                        text = "Gestión de Dispositivos",
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF1A237E),
-                        textAlign = TextAlign.Center
+                        "Dispositivos",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorTextoPrincipal
                     )
-                    Text(
-                        text = "Conecta nuevos niños o administra los equipos enlazados.",
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = colorAcabadoPrincipal)
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = colorSuperficieTarjetas // Se acopla a la superficie de la app
+                )
+            )
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            if (cargandoVerificacion) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = colorAcabadoPrincipal)
                 }
-
-                // --- SECCIÓN 2: LISTA DE DISPOSITIVOS CONECTADOS (O RECOVERY) ---
-                if (listaDispositivos.isNotEmpty()) {
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp),
+                    contentPadding = PaddingValues(bottom = 32.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    // --- SECCIÓN 1: ENCABEZADO ILUSTRATIVO ---
                     item {
-                        Text(
-                            text = "EQUIPOS VINCULADOS (${listaDispositivos.size})",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Gray,
-                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(colorAcabadoPrincipal.copy(alpha = 0.2f), colorAcabadoPrincipal.copy(alpha = 0.05f))
+                                        ),
+                                        shape = RoundedCornerShape(24.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Devices,
+                                    contentDescription = null,
+                                    tint = colorAcabadoPrincipal,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Gestión de Equipos",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Black,
+                                color = colorTextoPrincipal,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Vincula la tablet o celular de tu hijo para sincronizar sus rutinas visuales en tiempo real.",
+                                fontSize = 14.sp,
+                                color = colorTextoSecundario,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 12.dp)
+                            )
+                        }
                     }
 
-                    items(listaDispositivos) { dispositivo ->
+                    // --- SECCIÓN 2: FORMULARIO DE VINCULACIÓN ---
+                    item {
                         Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = colorSuperficieTarjetas),
+                            border = BorderStroke(1.dp, colorTextoSecundario.copy(alpha = 0.12f))
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column {
-                                    Text(
-                                        text = dispositivo.modelo,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp,
-                                        color = Color.DarkGray
+                            Column(modifier = Modifier.padding(20.dp)) {
+                                Text(
+                                    text = "CONECTAR NUEVO DISPOSITIVO",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colorAcabadoPrincipal,
+                                    letterSpacing = 1.sp
+                                )
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                OutlinedTextField(
+                                    value = codigoIngresado,
+                                    onValueChange = { if (it.length <= 6) codigoIngresado = it },
+                                    label = { Text("Código de 6 dígitos del niño") },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(14.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = colorAcabadoPrincipal,
+                                        focusedLabelColor = colorAcabadoPrincipal,
+                                        unfocusedBorderColor = colorTextoSecundario.copy(alpha = 0.2f),
+                                        focusedTextColor = colorTextoPrincipal,
+                                        unfocusedTextColor = colorTextoPrincipal,
+                                        unfocusedLabelColor = colorTextoSecundario
                                     )
+                                )
+
+                                if (mensajeError.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = "ID: ${dispositivo.id.take(12)}...",
-                                        fontSize = 12.sp,
-                                        color = Color.LightGray
+                                        text = mensajeError,
+                                        color = colorRojoSuave,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
                                     )
                                 }
 
-                                // 🔥 BOTÓN SALVAVIDAS: Si se pierde el celular, lo borras de la base de datos aquí
-                                IconButton(
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Button(
                                     onClick = {
-                                        database.child("dispositivos_niños").child(dispositivo.id).removeValue()
-                                    }
+                                        if (codigoIngresado.length == 6) {
+                                            mensajeError = ""
+                                            database.child("codigos_vinculacion").child(codigoIngresado)
+                                                .addListenerForSingleValueEvent(object : ValueEventListener {
+                                                    override fun onDataChange(snapshot: DataSnapshot) {
+                                                        if (snapshot.exists()) {
+                                                            val actualizaciones = mapOf(
+                                                                "estado" to "enlazado",
+                                                                "padreId" to idPadrePrueba
+                                                            )
+                                                            database.child("codigos_vinculacion").child(codigoIngresado)
+                                                                .updateChildren(actualizaciones)
+
+                                                            codigoIngresado = ""
+                                                            onLinkSuccess()
+                                                        } else {
+                                                            mensajeError = "El código no existe o ha expirado."
+                                                        }
+                                                    }
+                                                    override fun onCancelled(error: DatabaseError) {
+                                                        mensajeError = "Error de red en la vinculación."
+                                                    }
+                                                })
+                                        } else {
+                                            mensajeError = "Por favor, introduce los 6 números."
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = colorVerdePremium),
+                                    shape = RoundedCornerShape(14.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(50.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Desvincular",
-                                        tint = Color(0xFFE57373)
-                                    )
+                                    Text("VINCULAR DISPOSITIVO", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
                         }
                     }
-                }
 
-                // --- SECCIÓN 3: AGREGAR O CONECTAR DISPOSITIVO NUEVO ---
-                item {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Color.LightGray.copy(alpha = 0.5f))
-
-                    Text(
-                        text = "Conectar nuevo dispositivo",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colorAzulPadre,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    OutlinedTextField(
-                        value = codigoIngresado,
-                        onValueChange = { if (it.length <= 6) codigoIngresado = it },
-                        label = { Text("Código de 6 dígitos del niño") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = colorAzulPadre,
-                            focusedLabelColor = colorAzulPadre
+                    // --- SECCIÓN 3: LISTA DE DISPOSITIVOS VINCULADOS ---
+                    item {
+                        Text(
+                            text = "EQUIPOS ENLAZADOS (${listaDispositivos.size})",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            color = colorTextoSecundario,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(start = 4.dp, top = 8.dp)
                         )
-                    )
-
-                    if (mensajeError.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(text = mensajeError, color = Color.Red, fontSize = 14.sp, modifier = Modifier.fillMaxWidth())
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Button(
-                        onClick = {
-                            if (codigoIngresado.length == 6) {
-                                mensajeError = ""
-                                database.child("codigos_vinculacion").child(codigoIngresado)
-                                    .addListenerForSingleValueEvent(object : ValueEventListener {
-                                        override fun onDataChange(snapshot: DataSnapshot) {
-                                            if (snapshot.exists()) {
-                                                val actualizaciones = mapOf(
-                                                    "estado" to "enlazado",
-                                                    "padreId" to idPadrePrueba
-                                                )
-                                                database.child("codigos_vinculacion").child(codigoIngresado)
-                                                    .updateChildren(actualizaciones)
-
-                                                codigoIngresado = "" // Limpia el input
-                                                onLinkSuccess()
-                                            } else {
-                                                mensajeError = "El código no existe o expiró."
-                                            }
-                                        }
-                                        override fun onCancelled(error: DatabaseError) {
-                                            mensajeError = "Error de conexión."
-                                        }
-                                    })
-                            } else {
-                                mensajeError = "Introduce los 6 números."
+                    if (listaDispositivos.isEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = colorSuperficieTarjetas.copy(alpha = 0.5f)),
+                                border = BorderStroke(1.dp, colorTextoSecundario.copy(alpha = 0.1f))
+                            ) {
+                                Text(
+                                    text = "No hay dispositivos vinculados todavía.",
+                                    fontSize = 14.sp,
+                                    color = colorTextoSecundario,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(24.dp)
+                                )
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = colorVerdeExito),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth().height(55.dp)
-                    ) {
-                        Text("VINCULAR OTRO EQUIPO 🔗", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
+                        }
+                    } else {
+                        items(listaDispositivos) { dispositivo ->
+                            Card(
+                                shape = RoundedCornerShape(18.dp),
+                                colors = CardDefaults.cardColors(containerColor = colorSuperficieTarjetas),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                                border = BorderStroke(1.dp, colorTextoSecundario.copy(alpha = 0.12f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .background(colorAcabadoPrincipal.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.PhonelinkRing,
+                                            contentDescription = null,
+                                            tint = colorAcabadoPrincipal,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                                    Spacer(modifier = Modifier.width(14.dp))
 
-                    // Botón para salir ordenadamente de la pestaña
-                    TextButton(onClick = onNavigateBack) {
-                        Text("Volver al Panel Principal", color = Color.Gray, fontWeight = FontWeight.SemiBold)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = dispositivo.modelo,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            color = colorTextoPrincipal
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "ID: ${dispositivo.id.take(8).uppercase()}...",
+                                            fontSize = 12.sp,
+                                            color = colorTextoSecundario
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            database.child("dispositivos_niños").child(dispositivo.id).removeValue()
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Desvincular",
+                                            tint = colorRojoSuave
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

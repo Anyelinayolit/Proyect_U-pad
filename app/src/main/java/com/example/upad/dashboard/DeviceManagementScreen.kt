@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.example.upad.utils.BiometricHelper
+import com.example.upad.viewmodel.RoutineViewModel // 👈 Importación agregada de forma segura
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -30,7 +31,10 @@ data class DispositivoNiño(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeviceManagementScreen(onNavigateBack: () -> Unit) {
+fun DeviceManagementScreen(
+    routineViewModel: RoutineViewModel, // 👈 SOLUCIÓN: Agregamos el parámetro exacto que MainActivity te exige inyectar
+    onNavigateBack: () -> Unit
+) {
     val context = LocalContext.current
     val activity = context as FragmentActivity
 

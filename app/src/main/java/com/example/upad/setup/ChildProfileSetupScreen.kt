@@ -1,47 +1,38 @@
 package com.example.upad.setup
 
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.rememberAsyncImagePainter
 import com.example.upad.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,158 +41,273 @@ fun ChildProfileSetupScreen(
     onBackClick: () -> Unit,
     onSaveClick: () -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var age by remember { mutableStateOf("") }
-    var interests by remember { mutableStateOf("") }
-    var supportLevel by remember { mutableStateOf("Nivel 1") }
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val pantallaPequeña = configuration.screenHeightDp < 650
 
+    // --- PERSISTENCIA LOCAL (SharedPreferences) ---
+    val prefs = remember { context.getSharedPreferences("UPAD_PREFS", Context.MODE_PRIVATE) }
+
+    // 🔥 SOLUCIÓN AQUÍ: Forzamos la lectura reactiva del estado del tema
+    val esTemaOscuro by remember { mutableStateOf(prefs.getBoolean("TEMA_OSCURO", false)) }
+
+    var name by remember { mutableStateOf(prefs.getString("CHILD_NAME", "") ?: "") }
+    var age by remember { mutableStateOf(prefs.getString("CHILD_AGE", "") ?: "") }
+    var interests by remember { mutableStateOf(prefs.getString("CHILD_INTERESTS", "") ?: "") }
+
+    var imageUri by remember {
+        mutableStateOf<Uri?>(prefs.getString("CHILD_PHOTO_URI", null)?.let { Uri.parse(it) })
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            imageUri = uri
+            prefs.edit().putString("CHILD_PHOTO_URI", uri.toString()).apply()
+        }
+    }
+
+    // --- CONFIGURACIÓN DE COLORES MULTI-TEMA CORREGIDA ---
     val colorAzulTEA = Color(0xFF4FC3F7)
-    val colorFondoBase = Color(0xFFF0F4F8)
     val colorAmarilloTEA = Color(0xFFFFD54F)
+
+    // Si esTemaOscuro es true, aplicará tonos oscuros. Si no, usará blanco/gris.
+    val colorFondoBase = if (esTemaOscuro) Color(0xFF0F172A) else Color(0xFFF8FAFC)
+    val colorSuperficie = if (esTemaOscuro) Color(0xFF1E293B) else Color.White
+    val colorTextoPrincipal = if (esTemaOscuro) Color(0xFFF1F5F9) else Color(0xFF1E293B)
+    val colorTextoSecundario = if (esTemaOscuro) Color(0xFF94A3B8) else Color(0xFF64748B)
+    val colorBordeInput = if (esTemaOscuro) Color(0xFF334155) else Color(0xFFCBD5E1)
+    val colorFondoIconoDefecto = if (esTemaOscuro) Color(0xFF334155) else Color(0xFFE2E8F0)
+    val colorDivisor = if (esTemaOscuro) Color(0xFF334155) else Color(0xFFF1F5F9)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(colorFondoBase)
-            .verticalScroll(rememberScrollState())
     ) {
-        // --- CABECERA ESTILO U-PAD ---
+        // --- CABECERA ---
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 45.dp, bottomEnd = 45.dp))
-                .background(Color.White)
-                .padding(top = 40.dp, bottom = 24.dp, start = 16.dp, end = 24.dp)
+                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                .background(colorSuperficie)
+                .padding(
+                    top = if (pantallaPequeña) 30.dp else 40.dp,
+                    bottom = if (pantallaPequeña) 16.dp else 24.dp,
+                    start = 16.dp,
+                    end = 24.dp
+                )
         ) {
             IconButton(onClick = onBackClick) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = colorAzulTEA)
             }
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "CONFIGURAR PERFIL",
-                fontSize = 14.sp,
+                text = "CONFIGURACIÓN INICIAL",
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Black,
                 color = Color.LightGray,
-                modifier = Modifier.padding(start = 12.dp)
+                modifier = Modifier.padding(start = 12.dp),
+                letterSpacing = 1.5.sp
             )
             Text(
                 text = "¿Quién es el pequeño héroe?",
-                fontSize = 26.sp,
+                fontSize = if (pantallaPequeña) 22.sp else 26.sp,
                 fontWeight = FontWeight.Black,
-                color = colorAzulTEA,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                color = colorTextoPrincipal,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                lineHeight = if (pantallaPequeña) 28.sp else 32.sp
             )
         }
 
-        // --- CONTENIDO FORMULARIO ---
+        // --- FORMULARIO ---
         Column(
             modifier = Modifier
-                .padding(24.dp)
-                .fillMaxWidth(),
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // FOTO DE PERFIL CON LÁPIZ
+            Spacer(modifier = Modifier.height(if (pantallaPequeña) 16.dp else 24.dp))
+
+            // Avatar
             Box(
-                modifier = Modifier.size(160.dp),
+                modifier = Modifier
+                    .size(if (pantallaPequeña) 120.dp else 140.dp)
+                    .clickable { galleryLauncher.launch("image/*") },
                 contentAlignment = Alignment.BottomEnd
             ) {
-                // El círculo de la foto
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
                         .border(4.dp, colorAmarilloTEA, CircleShape)
-                        .clip(CircleShape)
-                        .clickable { /* Lógica para abrir selector de fotos */ },
-                    color = Color.White
+                        .clip(CircleShape),
+                    color = colorFondoIconoDefecto
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.icon), // Imagen por defecto
-                        contentDescription = "Foto de perfil",
-                        contentScale = ContentScale.Crop
-                    )
+                    if (imageUri != null) {
+                        Image(
+                            painter = rememberAsyncImagePainter(imageUri),
+                            contentDescription = "Foto de perfil",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.icon),
+                            contentDescription = "Foto por defecto",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
 
-                // Círculo pequeño con el lápiz (Botón de edición)
                 Surface(
                     modifier = Modifier
-                        .size(45.dp)
+                        .size(if (pantallaPequeña) 36.dp else 40.dp)
                         .clip(CircleShape)
-                        .border(2.dp, Color.White, CircleShape)
-                        .clickable { /* Lógica: Cámara o Galería */ },
+                        .border(2.dp, colorSuperficie, CircleShape),
                     color = colorAzulTEA,
-                    tonalElevation = 4.dp
+                    shadowElevation = 4.dp
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Editar foto",
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = "Cambiar Foto",
                         tint = Color.White,
-                        modifier = Modifier.padding(10.dp)
+                        modifier = Modifier.padding(if (pantallaPequeña) 8.dp else 10.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(if (pantallaPequeña) 16.dp else 24.dp))
 
-            // CAMPOS DE TEXTO
-            Text(
-                text = "INFORMACIÓN BÁSICA",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
-            )
+            // Tarjeta Adaptativa
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = colorSuperficie),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(if (pantallaPequeña) 16.dp else 20.dp)) {
 
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Nombre completo") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colorAzulTEA)
-            )
+                    Text(
+                        text = "INFORMACIÓN PERSONAL",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorAzulTEA,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Nombre del niño", color = colorTextoSecundario) },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = colorTextoSecundario) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = colorAzulTEA,
+                            unfocusedBorderColor = colorBordeInput,
+                            focusedContainerColor = colorSuperficie,
+                            unfocusedContainerColor = colorSuperficie,
+                            focusedTextColor = colorTextoPrincipal,
+                            unfocusedTextColor = colorTextoPrincipal
+                        )
+                    )
 
-            OutlinedTextField(
-                value = age,
-                onValueChange = { age = it },
-                label = { Text("Edad") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colorAzulTEA)
-            )
+                    Spacer(modifier = Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.height(24.dp))
+                    OutlinedTextField(
+                        value = age,
+                        onValueChange = { age = it },
+                        label = { Text("Edad", color = colorTextoSecundario) },
+                        leadingIcon = { Icon(Icons.Default.Face, contentDescription = null, tint = colorTextoSecundario) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = colorAzulTEA,
+                            unfocusedBorderColor = colorBordeInput,
+                            focusedContainerColor = colorSuperficie,
+                            unfocusedContainerColor = colorSuperficie,
+                            focusedTextColor = colorTextoPrincipal,
+                            unfocusedTextColor = colorTextoPrincipal
+                        )
+                    )
 
-            Text(
-                text = "DATOS EXTRAS DE APOYO",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
-            )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = colorDivisor)
+                    Spacer(modifier = Modifier.height(12.dp))
 
-            OutlinedTextField(
-                value = interests,
-                onValueChange = { interests = it },
-                label = { Text("Cosas que le encantan (ej. Dinosaurios, Música)") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colorAzulTEA)
-            )
+                    Text(
+                        text = "GUSTOS Y PREFERENCIAS",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorAzulTEA,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
 
-            Spacer(modifier = Modifier.height(32.dp))
+                    OutlinedTextField(
+                        value = interests,
+                        onValueChange = { interests = it },
+                        label = { Text("¿Qué cosas le encantan?", color = colorTextoSecundario) },
+                        leadingIcon = { Icon(Icons.Default.Favorite, contentDescription = null, tint = colorTextoSecundario) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 3,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = colorAzulTEA,
+                            unfocusedBorderColor = colorBordeInput,
+                            focusedContainerColor = colorSuperficie,
+                            unfocusedContainerColor = colorSuperficie,
+                            focusedTextColor = colorTextoPrincipal,
+                            unfocusedTextColor = colorTextoPrincipal
+                        )
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+        }
 
-            // BOTÓN GUARDAR
+        // --- BOTÓN INFERIOR ---
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(colorSuperficie)
+                .padding(horizontal = 20.dp, vertical = if (pantallaPequeña) 12.dp else 16.dp)
+        ) {
             Button(
-                onClick = onSaveClick,
+                onClick = {
+                    val nombreFinal = name.ifBlank { "Mateo" }
+                    val edadFinal = age.ifBlank { "6" }
+                    val interesesFinal = interests.ifBlank { "Dinosaurios, Rompecabezas" }
+
+                    prefs.edit().apply {
+                        putString("CHILD_NAME", nombreFinal)
+                        putString("CHILD_AGE", edadFinal)
+                        putString("CHILD_INTERESTS", interesesFinal)
+                        apply()
+                    }
+                    onSaveClick()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp),
-                shape = RoundedCornerShape(22.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = colorAzulTEA)
+                    .height(if (pantallaPequeña) 54.dp else 60.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = colorAzulTEA),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
-                Text("GUARDAR PERFIL", fontSize = 20.sp, fontWeight = FontWeight.Black)
+                Text(
+                    text = "CONTINUAR CONFIGURACIÓN ➡️",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Black,
+                    color = if (esTemaOscuro) Color.Black else Color.White
+                )
             }
         }
     }
