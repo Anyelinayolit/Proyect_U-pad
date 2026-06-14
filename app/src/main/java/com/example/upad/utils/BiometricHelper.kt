@@ -6,7 +6,8 @@ import androidx.biometric.BiometricPrompt
 import androidx.biometric.BiometricManager
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 
 object BiometricHelper {
 
@@ -62,12 +63,11 @@ object BiometricHelper {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 super.onAuthenticationSucceeded(result)
 
-                // 🔓/🔒 Huella correcta -> Cambiamos el valor en Firebase Realtime Database
-                val database = FirebaseDatabase.getInstance().reference
-                database.child("dispositivos_niños")
-                    .child(idDispositivoNiño)
-                    .child("kioscoActivo")
-                    .setValue(debeBloquear)
+                // 🔓/🔒 Huella correcta -> Cambiamos el valor en Firebase Firestore
+                val firestore = FirebaseFirestore.getInstance()
+                firestore.collection("dispositivos_niños")
+                    .document(idDispositivoNiño)
+                    .set(mapOf("kioscoActivo" to debeBloquear), SetOptions.merge())
                     .addOnSuccessListener {
                         val mensaje = if (debeBloquear) "¡Dispositivo infantil Bloqueado! 🔒" else "¡Dispositivo infantil Liberado! 🔓"
                         Toast.makeText(activity, mensaje, Toast.LENGTH_SHORT).show()

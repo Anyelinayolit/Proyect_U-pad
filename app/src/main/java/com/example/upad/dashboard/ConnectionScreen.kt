@@ -21,10 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 data class DispositivoVinculado(val id: String, val modelo: String = "Dispositivo del Niño")
 
@@ -45,32 +43,36 @@ fun ConnectionScreen(
     val colorVerdePremium = Color(0xFF2E7D32)
     val colorRojoSuave = Color(0xFFEF5350)
 
-    val idPadrePrueba = "PADRE_TEST"
+    val idPadre = remember { FirebaseAuth.getInstance().currentUser?.uid ?: "" }
     var codigoIngresado by remember { mutableStateOf("") }
     var cargandoVerificacion by remember { mutableStateOf(true) }
     var mensajeError by remember { mutableStateOf("") }
 
     val listaDispositivos = remember { mutableStateListOf<DispositivoVinculado>() }
-    val database = remember { FirebaseDatabase.getInstance().reference }
+    val firestore = remember { FirebaseFirestore.getInstance() }
 
     // --- ESCUCHAR MULTIDISPOSITIVOS EN TIEMPO REAL ---
-    LaunchedEffect(idPadrePrueba) {
-        database.child("dispositivos_niños")
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    listaDispositivos.clear()
-                    for (dispositivo in snapshot.children) {
-                        val padreIdEnBD = dispositivo.child("padreId").getValue(String::class.java)
-                        if (padreIdEnBD == idPadrePrueba) {
-                            listaDispositivos.add(DispositivoVinculado(id = dispositivo.key ?: ""))
-                        }
+    DisposableEffect(idPadre) {
+        val listener = firestore.collection("dispositivos_niños")
+            .whereEqualTo("padreId", idPadre)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    cargandoVerificacion = false
+                    return@addSnapshotListener
+                }
+                listaDispositivos.clear()
+                if (snapshot != null) {
+                    for (dispositivo in snapshot.documents) {
+                        val model = dispositivo.getString("modelo") ?: "Dispositivo del Niño"
+                        listaDispositivos.add(DispositivoVinculado(id = dispositivo.id, modelo = model))
                     }
-                    cargandoVerificacion = false
                 }
-                override fun onCancelled(error: DatabaseError) {
-                    cargandoVerificacion = false
-                }
-            })
+                cargandoVerificacion = false
+            }
+        
+        onDispose {
+            listener.remove()
+        }
     }
 
     Scaffold(
@@ -209,27 +211,30 @@ fun ConnectionScreen(
                                     onClick = {
                                         if (codigoIngresado.length == 6) {
                                             mensajeError = ""
-                                            database.child("codigos_vinculacion").child(codigoIngresado)
-                                                .addListenerForSingleValueEvent(object : ValueEventListener {
-                                                    override fun onDataChange(snapshot: DataSnapshot) {
-                                                        if (snapshot.exists()) {
-                                                            val actualizaciones = mapOf(
-                                                                "estado" to "enlazado",
-                                                                "padreId" to idPadrePrueba
-                                                            )
-                                                            database.child("codigos_vinculacion").child(codigoIngresado)
-                                                                .updateChildren(actualizaciones)
-
-                                                            codigoIngresado = ""
-                                                            onLinkSuccess()
-                                                        } else {
-                                                            mensajeError = "El código no existe o ha expirado."
-                                                        }
+                                            firestore.collection("codigos_vinculacion").document(codigoIngresado)
+                                                .get()
+                                                .addOnSuccessListener { snapshot ->
+                                                    if (snapshot.exists()) {
+                                                        val actualizaciones = mapOf(
+                                                            "estado" to "enlazado",
+                                                            "padreId" to idPadre
+                                                        )
+                                                        firestore.collection("codigos_vinculacion").document(codigoIngresado)
+                                                            .update(actualizaciones)
+                                                            .addOnSuccessListener {
+                                                                codigoIngresado = ""
+                                                                onLinkSuccess()
+                                                            }
+                                                            .addOnFailureListener {
+                                                                mensajeError = "Error de red en la vinculación."
+                                                            }
+                                                    } else {
+                                                        mensajeError = "El código no existe o ha expirado."
                                                     }
-                                                    override fun onCancelled(error: DatabaseError) {
-                                                        mensajeError = "Error de red en la vinculación."
-                                                    }
-                                                })
+                                                }
+                                                .addOnFailureListener {
+                                                    mensajeError = "Error de red en la vinculación."
+                                                }
                                         } else {
                                             mensajeError = "Por favor, introduce los 6 números."
                                         }
@@ -325,7 +330,7 @@ fun ConnectionScreen(
 
                                     IconButton(
                                         onClick = {
-                                            database.child("dispositivos_niños").child(dispositivo.id).removeValue()
+                                            firestore.collection("dispositivos_niños").document(dispositivo.id).delete()
                                         }
                                     ) {
                                         Icon(

@@ -30,7 +30,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.google.firebase.database.*
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 
 // Importaciones de tus pantallas
 import com.example.upad.auth.ForgotPasswordScreen
@@ -67,7 +68,8 @@ import com.example.upad.premium.PaymentViewScreen // Única importación premium
 class MainActivity : FragmentActivity() {
 
     private var ordenBloqueoPadreActiva by mutableStateOf(false)
-    private val database = FirebaseDatabase.getInstance().reference
+    private val firestore = FirebaseFirestore.getInstance()
+    private var kioscoListener: ListenerRegistration? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -75,16 +77,17 @@ class MainActivity : FragmentActivity() {
 
         val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
 
-        database.child("dispositivos_niños").child(deviceId)
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    if (snapshot.exists()) {
-                        val kioscoActivo = snapshot.child("kioscoActivo").getValue(Boolean::class.java) ?: false
-                        ordenBloqueoPadreActiva = kioscoActivo
-                    }
+        kioscoListener = firestore.collection("dispositivos_niños").document(deviceId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                
+                if (snapshot != null && snapshot.exists()) {
+                    val kioscoActivo = snapshot.getBoolean("kioscoActivo") ?: false
+                    ordenBloqueoPadreActiva = kioscoActivo
+                } else {
+                    ordenBloqueoPadreActiva = false
                 }
-                override fun onCancelled(error: DatabaseError) {}
-            })
+            }
 
         setContent {
             val repository = remember { FirebaseRepository() }
@@ -133,6 +136,11 @@ class MainActivity : FragmentActivity() {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             } catch (e: Exception) { e.printStackTrace() }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        kioscoListener?.remove()
     }
 }
 

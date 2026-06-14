@@ -17,10 +17,8 @@ import androidx.fragment.app.FragmentActivity
 import com.example.upad.utils.BiometricHelper
 import com.example.upad.viewmodel.RoutineViewModel // 👈 Importación agregada de forma segura
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 
 // Usamos un modelo consistente con los datos reales guardados en Firebase
 data class DispositivoNiño(
@@ -41,28 +39,28 @@ fun DeviceManagementScreen(
     var listaDispositivos by remember { mutableStateOf(listOf<DispositivoNiño>()) }
     var cargando by remember { mutableStateOf(true) }
 
-    // Usamos exactamente el mismo ID de prueba que declaraste en ConnectionScreen
-    val idPadrePrueba = "PADRE_TEST"
+    val firestore = remember { FirebaseFirestore.getInstance() }
+    val idPadre = remember { FirebaseAuth.getInstance().currentUser?.uid ?: "" }
 
     // 📡 ESCUCHA EN ESPEJO: Lee exactamente el mismo nodo y bajo la misma condición que ConnectionScreen
-    LaunchedEffect(idPadrePrueba) {
-        val refGlobal = FirebaseDatabase.getInstance().reference.child("dispositivos_niños")
+    DisposableEffect(idPadre) {
+        val listener = firestore.collection("dispositivos_niños")
+            .whereEqualTo("padreId", idPadre)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    cargando = false
+                    return@addSnapshotListener
+                }
 
-        refGlobal.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
                 val listaTemporal = mutableListOf<DispositivoNiño>()
-
-                for (dispositivo in snapshot.children) {
-                    val padreIdEnBD = dispositivo.child("padreId").getValue(String::class.java)
-
-                    // Condición idéntica a ConnectionScreen
-                    if (padreIdEnBD == idPadrePrueba) {
-                        val id = dispositivo.key ?: ""
+                if (snapshot != null) {
+                    for (dispositivo in snapshot.documents) {
+                        val id = dispositivo.id
                         // Si existe un nombre guardado lo toma, de lo contrario usa tu string por defecto
-                        val nombre = dispositivo.child("nombreDispositivo").getValue(String::class.java)
-                            ?: dispositivo.child("modelo").getValue(String::class.java)
+                        val nombre = dispositivo.getString("nombreDispositivo")
+                            ?: dispositivo.getString("modelo")
                             ?: "Tablet/Celular Niño"
-                        val activo = dispositivo.child("kioscoActivo").getValue(Boolean::class.java) ?: false
+                        val activo = dispositivo.getBoolean("kioscoActivo") ?: false
 
                         listaTemporal.add(DispositivoNiño(id, nombre, activo))
                     }
@@ -72,10 +70,9 @@ fun DeviceManagementScreen(
                 cargando = false
             }
 
-            override fun onCancelled(error: DatabaseError) {
-                cargando = false
-            }
-        })
+        onDispose {
+            listener.remove()
+        }
     }
 
     Scaffold(

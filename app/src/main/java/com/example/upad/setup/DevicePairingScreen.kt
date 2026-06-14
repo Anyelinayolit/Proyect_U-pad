@@ -25,10 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.FirebaseFirestore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,25 +35,25 @@ fun DevicePairingScreen(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val prefs = remember { context.getSharedPreferences("UPAD_PREFS", Context.MODE_PRIVATE) }
-
+ 
     // 🎨 DETECCIÓN DE TEMA REMOTO/LOCAL (Por defecto es falso -> Modo Claro)
     val esTemaOscuro = remember { prefs.getBoolean("TEMA_OSCURO", false) }
-
+ 
     // Extraemos variables guardadas en los pasos previos del Setup
     val childName = remember { prefs.getString("CHILD_NAME", "tu pequeño") ?: "tu pequeño" }
-
+ 
     // Extraemos el UID real del Padre logueado en Firebase Auth
     val currentParentId = remember {
-        FirebaseAuth.getInstance().currentUser?.uid ?: "PADRE_TEST"
+        FirebaseAuth.getInstance().currentUser?.uid ?: ""
     }
-
+ 
     // --- ESTADOS LÓGICOS DE CONEXIÓN ---
     var pairingCode by remember { mutableStateOf("") }
     var isPaired by remember { mutableStateOf(false) }
     var mensajeError by remember { mutableStateOf("") }
     var estaConectando by remember { mutableStateOf(false) }
-
-    val database = remember { FirebaseDatabase.getInstance().reference }
+ 
+    val firestore = remember { FirebaseFirestore.getInstance() }
     val pantallaPequeña = configuration.screenHeightDp < 650
 
     // --- PALETA DE COLORES ADAPTATIVA MULTI-TEMA ---
@@ -242,30 +239,34 @@ fun DevicePairingScreen(
                             mensajeError = ""
                             estaConectando = true
 
-                            database.child("codigos_vinculacion").child(pairingCode)
-                                .addListenerForSingleValueEvent(object : ValueEventListener {
-                                    override fun onDataChange(snapshot: DataSnapshot) {
+                            firestore.collection("codigos_vinculacion").document(pairingCode)
+                                .get()
+                                .addOnSuccessListener { snapshot ->
+                                    if (snapshot.exists()) {
+                                        val actualizaciones = mapOf(
+                                            "estado" to "enlazado",
+                                            "padreId" to currentParentId
+                                        )
+
+                                        firestore.collection("codigos_vinculacion").document(pairingCode)
+                                            .update(actualizaciones)
+                                            .addOnSuccessListener {
+                                                estaConectando = false
+                                                isPaired = true
+                                            }
+                                            .addOnFailureListener { error ->
+                                                estaConectando = false
+                                                mensajeError = "Error al vincular: ${error.message}"
+                                            }
+                                    } else {
                                         estaConectando = false
-                                        if (snapshot.exists()) {
-                                            val actualizaciones = mapOf(
-                                                "estado" to "enlazado",
-                                                "padreId" to currentParentId
-                                            )
-
-                                            database.child("codigos_vinculacion").child(pairingCode)
-                                                .updateChildren(actualizaciones)
-
-                                            isPaired = true
-                                        } else {
-                                            mensajeError = "El código no existe o ha expirado."
-                                        }
+                                        mensajeError = "El código no existe o ha expirado."
                                     }
-
-                                    override fun onCancelled(error: DatabaseError) {
-                                        estaConectando = false
-                                        mensajeError = "Error de red: ${error.message}"
-                                    }
-                                })
+                                }
+                                .addOnFailureListener { error ->
+                                    estaConectando = false
+                                    mensajeError = "Error de red: ${error.message}"
+                                }
                         } else {
                             mensajeError = "Introduce los 6 números obligatorios."
                         }

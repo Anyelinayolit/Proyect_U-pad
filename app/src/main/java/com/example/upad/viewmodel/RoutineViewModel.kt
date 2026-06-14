@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.collectLatest
 import java.util.Calendar
 import kotlinx.coroutines.flow.asStateFlow
+import com.google.firebase.firestore.ListenerRegistration
 
 data class TaskItem(
     val actividad: String = "",
@@ -35,6 +36,10 @@ class RoutineViewModel(
     private val dataStoreManager: DataStoreManager
 ) : ViewModel() {
 
+    private var listenerManana: ListenerRegistration? = null
+    private var listenerTarde: ListenerRegistration? = null
+    private var listenerNoche: ListenerRegistration? = null
+
     private val _isPremiumManual = MutableStateFlow(false)
     val isUserPremium: StateFlow<Boolean> = _isPremiumManual
 
@@ -46,7 +51,7 @@ class RoutineViewModel(
         }
     }
 
-    // 🔥 Cambiar de plan sincronizando localmente (DataStore) y en la nube (Firebase Realtime Database)
+    // 🔥 Cambiar de plan sincronizando localmente (DataStore) y en la nube (Firebase Firestore)
     fun setSuscripcionManual(activarPremium: Boolean, userId: String? = null) {
         viewModelScope.launch {
             dataStoreManager.setPremiumStatus(activarPremium)
@@ -54,13 +59,7 @@ class RoutineViewModel(
 
             if (!userId.isNullOrEmpty()) {
                 try {
-                    com.google.firebase.database.FirebaseDatabase
-                        .getInstance("https://u-pad-1f4a7-default-rtdb.firebaseio.com/")
-                        .reference
-                        .child("usuarios")
-                        .child(userId)
-                        .child("isPremium")
-                        .setValue(activarPremium)
+                    repository.setPremiumStatus(userId, activarPremium)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -101,9 +100,13 @@ class RoutineViewModel(
 
     fun cargarRutinasDesdeFirebase(userId: String) {
         viewModelScope.launch {
-            repository.escucharRutinasDelPadre(userId, "MAÑANA") { lista -> _tasksManana.value = lista }
-            repository.escucharRutinasDelPadre(userId, "TARDE") { lista -> _tasksTarde.value = lista }
-            repository.escucharRutinasDelPadre(userId, "NOCHE") { lista -> _tasksNoche.value = lista }
+            listenerManana?.remove()
+            listenerTarde?.remove()
+            listenerNoche?.remove()
+
+            listenerManana = repository.escucharRutinasDelPadre(userId, "MAÑANA") { lista -> _tasksManana.value = lista }
+            listenerTarde = repository.escucharRutinasDelPadre(userId, "TARDE") { lista -> _tasksTarde.value = lista }
+            listenerNoche = repository.escucharRutinasDelPadre(userId, "NOCHE") { lista -> _tasksNoche.value = lista }
         }
     }
 
@@ -181,12 +184,13 @@ class RoutineViewModel(
                 else -> _tasksNoche.value = listaActual
             }
 
-            val database = com.google.firebase.database.FirebaseDatabase
-                .getInstance("https://u-pad-1f4a7-default-rtdb.firebaseio.com/")
-                .reference
-
-            database.child("routines").child(userId).child(turnoUpper)
-                .setValue(listaActual)
+            viewModelScope.launch {
+                try {
+                    repository.saveRoutine(userId, turnoUpper, listaActual)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
     }
 
@@ -264,5 +268,12 @@ class RoutineViewModel(
                 e.printStackTrace()
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        listenerManana?.remove()
+        listenerTarde?.remove()
+        listenerNoche?.remove()
     }
 }

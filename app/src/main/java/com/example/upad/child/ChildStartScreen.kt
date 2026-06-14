@@ -28,10 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.upad.viewmodel.RoutineViewModel
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.SetOptions
 import java.util.Calendar
 
 @Composable
@@ -54,63 +53,93 @@ fun ChildStartScreen(
 
     var verTareasModoBasico by remember { mutableStateOf(false) }
 
-    val database = remember {
-        FirebaseDatabase.getInstance("https://u-pad-1f4a7-default-rtdb.firebaseio.com/").reference
-    }
+    val firestore = remember { FirebaseFirestore.getInstance() }
 
-    LaunchedEffect(deviceId) {
-        database.child("dispositivos_niños").child(deviceId)
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    if (snapshot.exists() && snapshot.hasChild("padreId")) {
-                        val pId = snapshot.child("padreId").getValue(String::class.java) ?: ""
-                        if (pId.isNotEmpty()) {
+    DisposableEffect(deviceId) {
+        var devicesListener: ListenerRegistration? = null
+        var premiumListener: ListenerRegistration? = null
+        var pairingCodeListener: ListenerRegistration? = null
+        var codigoGeneradoEnSesion = false
+
+        devicesListener = firestore.collection("dispositivos_niños").document(deviceId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    cargando = false
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null && snapshot.exists() && snapshot.contains("padreId")) {
+                    val pId = snapshot.getString("padreId") ?: ""
+                    if (pId.isNotEmpty()) {
+                        estaVinculado = true
+
+                        // Solo recargamos rutinas y listener si el ID del padre realmente cambió o es el primero
+                        if (padreIdAsociado != pId) {
                             padreIdAsociado = pId
-                            estaVinculado = true
                             routineViewModel.cargarRutinasDesdeFirebase(pId)
 
-                            database.child("usuarios").child(pId).child("isPremium")
-                                .addValueEventListener(object : ValueEventListener {
-                                    override fun onDataChange(userSnapshot: DataSnapshot) {
-                                        esPremiumPorPadre = userSnapshot.getValue(Boolean::class.java) ?: false
+                            // Apagamos listener premium del padre anterior si existiera
+                            premiumListener?.remove()
+                            premiumListener = firestore.collection("users").document(pId)
+                                .addSnapshotListener { userSnapshot, userError ->
+                                    if (userError != null) {
                                         cargando = false
+                                        return@addSnapshotListener
                                     }
-                                    override fun onCancelled(error: DatabaseError) { cargando = false }
-                                })
-                        } else { cargando = false }
-                    } else {
-                        if (codigoNiño == "------") {
-                            val nuevoCodigo = (100000..999999).random().toString()
-                            codigoNiño = nuevoCodigo
-
-                            val datosConexion = mapOf(
-                                "deviceId" to deviceId,
-                                "estado" to "esperando",
-                                "padreId" to ""
-                            )
-                            database.child("codigos_vinculacion").child(nuevoCodigo).setValue(datosConexion)
-
-                            database.child("codigos_vinculacion").child(nuevoCodigo)
-                                .addValueEventListener(object : ValueEventListener {
-                                    override fun onDataChange(codeSnapshot: DataSnapshot) {
-                                        if (codeSnapshot.exists()) {
-                                            val estado = codeSnapshot.child("estado").getValue(String::class.java)
-                                            val padreId = codeSnapshot.child("padreId").getValue(String::class.java)
-
-                                            if (estado == "enlazado" && !padreId.isNullOrEmpty()) {
-                                                database.child("dispositivos_niños").child(deviceId).child("padreId").setValue(padreId)
-                                                database.child("codigos_vinculacion").child(nuevoCodigo).removeValue()
-                                            }
-                                        }
+                                    if (userSnapshot != null && userSnapshot.exists()) {
+                                        esPremiumPorPadre = userSnapshot.getBoolean("isPremium") ?: false
                                     }
-                                    override fun onCancelled(error: DatabaseError) {}
-                                })
+                                    cargando = false
+                                }
                         }
+
+                        // Limpiamos el listener del código de emparejamiento pues ya está vinculado
+                        pairingCodeListener?.remove()
+                        pairingCodeListener = null
+                    } else {
                         cargando = false
                     }
+                } else {
+                    if (codigoNiño == "------" && !codigoGeneradoEnSesion) {
+                        codigoGeneradoEnSesion = true
+                        val nuevoCodigo = (100000..999999).random().toString()
+                        codigoNiño = nuevoCodigo
+
+                        val datosConexion = mapOf(
+                            "deviceId" to deviceId,
+                            "estado" to "esperando",
+                            "padreId" to ""
+                        )
+                        firestore.collection("codigos_vinculacion").document(nuevoCodigo)
+                            .set(datosConexion)
+
+                        pairingCodeListener = firestore.collection("codigos_vinculacion").document(nuevoCodigo)
+                            .addSnapshotListener { codeSnapshot, codeError ->
+                                if (codeError != null) return@addSnapshotListener
+
+                                if (codeSnapshot != null && codeSnapshot.exists()) {
+                                    val estado = codeSnapshot.getString("estado")
+                                    val padreId = codeSnapshot.getString("padreId")
+
+                                    if (estado == "enlazado" && !padreId.isNullOrEmpty()) {
+                                        firestore.collection("dispositivos_niños").document(deviceId)
+                                            .set(mapOf("padreId" to padreId), SetOptions.merge())
+
+                                        firestore.collection("codigos_vinculacion").document(nuevoCodigo)
+                                            .delete()
+                                    }
+                                }
+                            }
+                    }
+                    cargando = false
                 }
-                override fun onCancelled(error: DatabaseError) { cargando = false }
-            })
+            }
+
+        onDispose {
+            devicesListener?.remove()
+            premiumListener?.remove()
+            pairingCodeListener?.remove()
+        }
     }
 
     val tasksManana by routineViewModel.tasksManana.collectAsState()
