@@ -32,7 +32,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-
+// 🎯 Apunta al paquete dashboard que es donde vive tu pantalla realmente
+import com.example.upad.dashboard.HijoTrackingScreen
 // Importaciones de tus pantallas
 import com.example.upad.auth.ForgotPasswordScreen
 import com.example.upad.auth.LoginScreen
@@ -356,7 +357,29 @@ fun UPadNavigation(
                         onNavigateToConnection = { navController.navigate("connection_code") },
                         onNavigateToAnalytics = { navController.navigate("analytics") },
                         onNavigateToDeviceManagement = { navController.navigate("device_management") },
-                        onNavigateToChangePlan = { navController.navigate("change_plan") }
+                        onNavigateToChangePlan = { navController.navigate("change_plan") },
+
+                        // 🎯 CORREGIDO: Ahora el patrón coincide perfectamente con el NavHost inferior
+                        onNavigateToTracking = { hijoId ->
+                            navController.navigate("tracking/$hijoId")
+                        }
+                    )
+                }
+
+                // 🎯 RUTA DE RASTREO CORREGIDA E INTERRUPTOR EN ROJO ELIMINADO
+                // 🎯 RUTA DE RASTREO CORREGIDA E INTERRUPTOR EN ROJO ELIMINADO
+                composable(
+                    route = "tracking/{hijoId}",
+                    arguments = listOf(navArgument("hijoId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val hijoId = backStackEntry.arguments?.getString("hijoId") ?: ""
+
+                    val trackingViewModel: com.example.upad.viewmodel.TrackingViewModel = viewModel()
+
+                    HijoTrackingScreen(
+                        hijoId = hijoId,
+                        trackingViewModel = trackingViewModel,
+                        onNavigateBack = { navController.popBackStack() } // ✨ Con esto se borra el error en rojo al instante
                     )
                 }
 

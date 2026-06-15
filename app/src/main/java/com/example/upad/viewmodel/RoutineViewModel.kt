@@ -51,7 +51,6 @@ class RoutineViewModel(
         }
     }
 
-    // 🔥 Cambiar de plan sincronizando localmente (DataStore) y en la nube (Firebase Firestore)
     fun setSuscripcionManual(activarPremium: Boolean, userId: String? = null) {
         viewModelScope.launch {
             dataStoreManager.setPremiumStatus(activarPremium)
@@ -227,25 +226,51 @@ class RoutineViewModel(
 
     fun agregarActividadAutomatica(userId: String, turn: String, textoCompleto: String, diasSeleccionados: List<String>) {
         val turnoUpper = turn.uppercase()
-        val palabraClave = textoCompleto.trim().split(" ").firstOrNull() ?: "rutina"
 
         viewModelScope.launch {
             var urlImagenFinal = ""
             try {
-                val resultados = arasaacService.searchPictograms(palabraClave)
-                if (resultados.isNotEmpty()) {
-                    val idImagen = resultados.first()._id
-                    urlImagenFinal = "https://api.arasaac.org/api/pictograms/$idImagen"
+                // ✅ Normalizar el texto completo
+                val textoNormalizado = textoCompleto.trim()
+                    .lowercase()
+                    .replace(Regex("[áàä]"), "a")
+                    .replace(Regex("[éèë]"), "e")
+                    .replace(Regex("[íìï]"), "i")
+                    .replace(Regex("[óòö]"), "o")
+                    .replace(Regex("[úùü]"), "u")
+                    .replace(Regex("[^a-z0-9 ]"), "")
+
+                // ✅ Separar en palabras y probar una por una
+                val palabras = textoNormalizado.split(" ")
+                    .map { it.trim() }
+                    .filter { it.length > 2 }
+
+                android.util.Log.d("ARASAAC", "Palabras a probar: $palabras")
+
+                for (palabra in palabras) {
+                    android.util.Log.d("ARASAAC", "Probando palabra: $palabra")
+                    val resultados = arasaacService.searchPictograms(palabra)
+                    android.util.Log.d("ARASAAC", "Resultados para '$palabra': ${resultados.size}")
+
+                    if (resultados.isNotEmpty()) {
+                        val idImagen = resultados.first()._id
+                        urlImagenFinal = "https://static.arasaac.org/pictograms/$idImagen/${idImagen}_300.png"
+                        android.util.Log.d("ARASAAC", "✅ Imagen encontrada con '$palabra': $urlImagenFinal")
+                        break // ✅ Encontró imagen, para de buscar
+                    }
                 }
+
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("ARASAAC", "Error: ${e.message}")
             }
+
+            android.util.Log.d("ARASAAC", "URL final guardada: $urlImagenFinal")
 
             val mapaInicialEstados = diasSeleccionados.associate { it.uppercase().trim() to false }
 
             val nuevaTarea = TaskItem(
                 actividad = textoCompleto.uppercase(),
-                palabraClave = palabraClave.uppercase(),
+                palabraClave = textoCompleto.trim(),
                 imageUrl = urlImagenFinal,
                 dias = diasSeleccionados.map { it.trim() },
                 estadosPorDia = mapaInicialEstados

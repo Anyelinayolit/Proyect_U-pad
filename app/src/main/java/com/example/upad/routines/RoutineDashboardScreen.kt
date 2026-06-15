@@ -1,5 +1,6 @@
 package com.example.upad.dashboard
 
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -12,7 +13,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.LightMode
@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -61,7 +63,8 @@ fun RoutineDashboardScreen(
     onNavigateToProfile: () -> Unit = {},
     onNavigateToConnection: () -> Unit = {},
     onNavigateToDeviceManagement: () -> Unit = {},
-    onNavigateToChangePlan: () -> Unit = {}
+    onNavigateToChangePlan: () -> Unit = {},
+    onNavigateToTracking: (String) -> Unit = {}
 ) {
     val colorAcabadoPrincipal = MaterialTheme.colorScheme.primary
     val colorFondoBase = MaterialTheme.colorScheme.background
@@ -71,16 +74,25 @@ fun RoutineDashboardScreen(
 
     val firebaseAuth = remember { FirebaseAuth.getInstance() }
     val currentUser = firebaseAuth.currentUser
-    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // ✅ Se obtiene el contexto correctamente desde Compose
+    val context = LocalContext.current
 
     val esPremium by routineViewModel.isUserPremium.collectAsState()
     val isDarkMode by routineViewModel.isDarkMode.collectAsState()
 
+    // ✅ Corregido el acceso a SharedPreferences usando la variable context local
+    val hijoVinculadoId = remember(currentUser) {
+        context.getSharedPreferences("UPAD_PREFS", Context.MODE_PRIVATE)
+            .getString("HIJO_VINCULADO_ID", "DISPOSITIVO_PADRE")
+    }
+
     val colorDinamicoSuscripcion = if (esPremium) Color(0xFFC5A059) else colorAcabadoPrincipal
 
+    // ✅ Corregido aquí también
     var parentName by remember {
         mutableStateOf(
-            context.getSharedPreferences("UPAD_PREFS", android.content.Context.MODE_PRIVATE)
+            context.getSharedPreferences("UPAD_PREFS", Context.MODE_PRIVATE)
                 .getString("PARENT_NAME", "PADRE/TUTOR") ?: "PADRE/TUTOR"
         )
     }
@@ -91,10 +103,14 @@ fun RoutineDashboardScreen(
             val nameToDisplay = currentUser.displayName?.uppercase() ?: emailName
             if (!nameToDisplay.isNullOrBlank()) {
                 parentName = nameToDisplay
-                context.getSharedPreferences("UPAD_PREFS", android.content.Context.MODE_PRIVATE)
+                context.getSharedPreferences("UPAD_PREFS", Context.MODE_PRIVATE)
                     .edit().putString("PARENT_NAME", nameToDisplay).apply()
             }
         }
+    }
+
+    val onUbicarHijoAccionUnificada = {
+        onNavigateToTracking(hijoVinculadoId ?: "DISPOSITIVO_PADRE")
     }
 
     val childText = "tu hijo"
@@ -232,7 +248,6 @@ fun RoutineDashboardScreen(
                         scope.launch { drawerState.close() }
                         val uid = currentUser?.uid ?: ""
                         if (esPremium) {
-                            // 🔥 Se envía el UID actual para dar de baja el plan en la nube
                             routineViewModel.cancelPremium(uid)
                         } else {
                             onNavigateToChangePlan()
@@ -241,6 +256,28 @@ fun RoutineDashboardScreen(
                     colors = drawerColors,
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
+
+                if (esPremium) {
+                    NavigationDrawerItem(
+                        icon = { Text(text = "📍", fontSize = 20.sp) },
+                        label = { Text(text = "Ubicar a mi Hijo", fontWeight = FontWeight.Bold) },
+                        badge = {
+                            Surface(
+                                color = Color(0xFFFFD700),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text("PRO", fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp))
+                            }
+                        },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onUbicarHijoAccionUnificada()
+                        },
+                        colors = drawerColors,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                }
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Analytics, contentDescription = null) },
@@ -271,6 +308,7 @@ fun RoutineDashboardScreen(
                     colors = drawerColors,
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
+
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Person, contentDescription = null) },
                     label = { Text("Mi Perfil", fontWeight = FontWeight.Medium) },
@@ -294,12 +332,22 @@ fun RoutineDashboardScreen(
             containerColor = colorFondoBase,
             floatingActionButton = {
                 FloatingActionButton(
-                    onClick = { onNavigateToCreateRoutine(diaSeleccionado) },
+                    onClick = {
+                        if (esPremium) {
+                            onUbicarHijoAccionUnificada()
+                        } else {
+                            onNavigateToCreateRoutine(diaSeleccionado)
+                        }
+                    },
                     containerColor = colorDinamicoSuscripcion,
                     contentColor = if (esPremium && !isDarkMode) Color.Black else Color.White,
                     shape = CircleShape
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Crear nueva rutina", modifier = Modifier.size(30.dp))
+                    if (esPremium) {
+                        Text(text = "🗺️", fontSize = 26.sp)
+                    } else {
+                        Icon(Icons.Default.Add, contentDescription = "Crear nueva rutina", modifier = Modifier.size(30.dp))
+                    }
                 }
             }
         ) { paddingValues ->
@@ -564,7 +612,8 @@ fun RoutineProgressCard(
     colorTextoSec: Color,
     onClick: () -> Unit
 ) {
-    val progress = if (routine.totalTasks > 0) routine.completedTasks.toFloat() / routine.totalTasks.toFloat() else 0f
+    val factorProgreso = if (routine.totalTasks > 0) routine.completedTasks.toFloat() / routine.totalTasks else 0f
+    val porcentajeTexto = (factorProgreso * 100).toInt()
 
     Card(
         modifier = Modifier
@@ -584,30 +633,52 @@ fun RoutineProgressCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(50.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(routine.color.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(imageVector = routine.icon, contentDescription = null, tint = routine.color, modifier = Modifier.size(28.dp))
+                        Icon(
+                            imageVector = routine.icon,
+                            contentDescription = null,
+                            tint = routine.color,
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
                     Column {
-                        Text(text = routine.name, fontSize = 18.sp, fontWeight = FontWeight.Black, color = colorTexto)
-                        Text(text = "${routine.completedTasks} de ${routine.totalTasks} tareas", fontSize = 14.sp, color = colorTextoSec)
+                        Text(
+                            text = routine.name,
+                            color = colorTexto,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = "${routine.completedTasks}/${routine.totalTasks} tareas logradas",
+                            color = colorTextoSec.copy(alpha = 0.7f),
+                            fontSize = 12.sp
+                        )
                     }
                 }
-                Text(text = "${(progress * 100).toInt()}%", fontSize = 16.sp, fontWeight = FontWeight.Black, color = routine.color)
+
+                Text(
+                    text = "$porcentajeTexto%",
+                    color = routine.color,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black
+                )
             }
-            Spacer(modifier = Modifier.height(20.dp))
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             LinearProgressIndicator(
-                progress = { progress },
+                progress = { factorProgreso },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(10.dp)
+                    .height(8.dp)
                     .clip(CircleShape),
                 color = routine.color,
-                trackColor = routine.color.copy(alpha = 0.1f),
+                trackColor = routine.color.copy(alpha = 0.2f)
             )
         }
     }

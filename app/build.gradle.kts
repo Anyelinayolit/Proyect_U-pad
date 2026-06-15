@@ -96,6 +96,11 @@ dependencies {
     // También asegúrate de tener las dependencias base de Compose actualizadas
     implementation("androidx.compose.ui:ui:1.6.7")
     implementation("androidx.compose.material:material-icons-extended:1.6.7")
-// 🤖 SDK de Firebase Vertex AI para usar Gemini 2.5
-    implementation("com.google.firebase:firebase-vertexai:16.0.0-beta01")
+/// Pega esta línea:gemini
+    // Cambia la versión 0.9.0 por la 0.10.0 (o superior si usas un catálogo de versiones)
+// Cambia el 0.10.0 problemático por la versión verificada de producción
+    // Esta versión está totalmente disponible en los servidores y corrige las rutas de red internas de Gemini
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")    // 🗺️ Dependencias de Google Maps para Jetpack Compose
+    implementation("com.google.maps.android:maps-compose:4.3.3")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
 }
