@@ -36,6 +36,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".widget.ParentRoutineWidgetProvider"
+            android:exported="true"
+            android:label="Progreso de Hoy">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.upad.widget.ACTION_REFRESH" />
+                <action android:name="com.example.upad.widget.ACTION_DATA_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/parent_routine_widget_info" />
+        </receiver>
     </application>
 
 </manifest>

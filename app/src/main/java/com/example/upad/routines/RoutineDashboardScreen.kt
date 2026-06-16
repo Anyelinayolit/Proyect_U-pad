@@ -117,12 +117,10 @@ fun RoutineDashboardScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    val diasSemana = listOf("LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO", "DOMINGO")
+    val diasSemana = com.example.upad.utils.RoutineProgressCalculator.diasSemana
 
     val diaDeHoy = remember {
-        val formato = SimpleDateFormat("EEEE", Locale("es", "ES")).format(Date()).uppercase()
-        val formateado = formato.replace("É", "E").replace("Í", "I").replace("Á", "A")
-        if (diasSemana.contains(formateado)) formateado else "LUNES"
+        com.example.upad.utils.RoutineProgressCalculator.obtenerDiaDeHoy()
     }
 
     val numeroDeHoyReal = remember { Calendar.getInstance().get(Calendar.DAY_OF_MONTH) }
@@ -161,44 +159,32 @@ fun RoutineDashboardScreen(
     val allTasksTarde by routineViewModel.tasksTarde.collectAsState()
     val allTasksNoche by routineViewModel.tasksNoche.collectAsState()
 
-    val prefijoDiaSeleccionado = when (diaSeleccionado) {
-        "MIÉRCOLES", "MIERCOLES" -> "MIÉ"
-        "SÁBADO", "SABADO" -> "SÁB"
-        else -> diaSeleccionado.take(3)
-    }
+    val prefijoDiaSeleccionado = com.example.upad.utils.RoutineProgressCalculator.obtenerPrefijoDia(diaSeleccionado)
 
-    val tasksMananaFiltradas = allTasksManana.filter { task ->
-        task.dias.isEmpty() || task.dias.any { it.uppercase().trim().startsWith(prefijoDiaSeleccionado.uppercase()) }
-    }
-
-    val tasksTardeFiltradas = allTasksTarde.filter { task ->
-        task.dias.isEmpty() || task.dias.any { it.uppercase().trim().startsWith(prefijoDiaSeleccionado.uppercase()) }
-    }
-
-    val tasksNocheFiltradas = allTasksNoche.filter { task ->
-        task.dias.isEmpty() || task.dias.any { it.uppercase().trim().startsWith(prefijoDiaSeleccionado.uppercase()) }
-    }
+    val progresoManana = com.example.upad.utils.RoutineProgressCalculator.calcularProgreso(allTasksManana, prefijoDiaSeleccionado)
+    val progresoTarde = com.example.upad.utils.RoutineProgressCalculator.calcularProgreso(allTasksTarde, prefijoDiaSeleccionado)
+    val progresoNoche = com.example.upad.utils.RoutineProgressCalculator.calcularProgreso(allTasksNoche, prefijoDiaSeleccionado)
 
     val routines = listOf(
         RoutineItem(
             name = "MAÑANA",
             icon = Icons.Default.LightMode,
-            totalTasks = tasksMananaFiltradas.size,
-            completedTasks = tasksMananaFiltradas.count { it.estaCompletadaHoy(prefijoDiaSeleccionado) },
+            totalTasks = progresoManana.first,
+            completedTasks = progresoManana.second,
             color = Color(0xFFFFB74D)
         ),
         RoutineItem(
             name = "TARDE",
             icon = Icons.Default.WbTwilight,
-            totalTasks = tasksTardeFiltradas.size,
-            completedTasks = tasksTardeFiltradas.count { it.estaCompletadaHoy(prefijoDiaSeleccionado) },
+            totalTasks = progresoTarde.first,
+            completedTasks = progresoTarde.second,
             color = Color(0xFF81C784)
         ),
         RoutineItem(
             name = "NOCHE",
             icon = Icons.Default.NightsStay,
-            totalTasks = tasksNocheFiltradas.size,
-            completedTasks = tasksNocheFiltradas.count { it.estaCompletadaHoy(prefijoDiaSeleccionado) },
+            totalTasks = progresoNoche.first,
+            completedTasks = progresoNoche.second,
             color = Color(0xFF9575CD)
         )
     )

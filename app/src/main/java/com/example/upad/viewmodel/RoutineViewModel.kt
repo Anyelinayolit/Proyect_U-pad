@@ -103,10 +103,49 @@ class RoutineViewModel(
             listenerTarde?.remove()
             listenerNoche?.remove()
 
-            listenerManana = repository.escucharRutinasDelPadre(userId, "MAÑANA") { lista -> _tasksManana.value = lista }
-            listenerTarde = repository.escucharRutinasDelPadre(userId, "TARDE") { lista -> _tasksTarde.value = lista }
-            listenerNoche = repository.escucharRutinasDelPadre(userId, "NOCHE") { lista -> _tasksNoche.value = lista }
+            listenerManana = repository.escucharRutinasDelPadre(userId, "MAÑANA") { lista ->
+                _tasksManana.value = lista
+                notificarCambioAlWidget()
+            }
+            listenerTarde = repository.escucharRutinasDelPadre(userId, "TARDE") { lista ->
+                _tasksTarde.value = lista
+                notificarCambioAlWidget()
+            }
+            listenerNoche = repository.escucharRutinasDelPadre(userId, "NOCHE") { lista ->
+                _tasksNoche.value = lista
+                notificarCambioAlWidget()
+            }
         }
+    }
+
+    private fun notificarCambioAlWidget() {
+        try {
+            val context = com.google.firebase.FirebaseApp.getInstance().applicationContext
+            val prefs = context.getSharedPreferences("WIDGET_PREFS", Context.MODE_PRIVATE)
+            val diaDeHoy = com.example.upad.utils.RoutineProgressCalculator.obtenerDiaDeHoy()
+            val prefijoDia = com.example.upad.utils.RoutineProgressCalculator.obtenerPrefijoDia(diaDeHoy)
+            
+            val progManana = calcularPorcentaje(_tasksManana.value, prefijoDia)
+            val progTarde = calcularPorcentaje(_tasksTarde.value, prefijoDia)
+            val progNoche = calcularPorcentaje(_tasksNoche.value, prefijoDia)
+            
+            prefs.edit().apply {
+                putInt("PROGRESO_MANANA", progManana)
+                putInt("PROGRESO_TARDE", progTarde)
+                putInt("PROGRESO_NOCHE", progNoche)
+                putLong("ULTIMO_FETCH", System.currentTimeMillis())
+                apply()
+            }
+            
+            com.example.upad.widget.ParentRoutineWidgetProvider.notificarCambioDatos(context)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun calcularPorcentaje(tareas: List<TaskItem>, prefijoDia: String): Int {
+        val (total, completadas) = com.example.upad.utils.RoutineProgressCalculator.calcularProgreso(tareas, prefijoDia)
+        return if (total > 0) (completadas * 100) / total else 0
     }
 
     fun searchArasaac(query: String) {
