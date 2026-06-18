@@ -56,8 +56,8 @@ data class RoutineItem(
 @Composable
 fun RoutineDashboardScreen(
     routineViewModel: com.example.upad.viewmodel.RoutineViewModel,
-    onNavigateToCreateRoutine: (String) -> Unit,
-    onRoutineClick: (String) -> Unit,
+    onNavigateToCreateRoutine: (String, String) -> Unit,
+    onRoutineClick: (String, String) -> Unit,
     onNavigateToAnalytics: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
@@ -128,6 +128,15 @@ fun RoutineDashboardScreen(
     var diaSeleccionado by remember { mutableStateOf(diaDeHoy) }
     var diaNumeroSeleccionado by remember { mutableStateOf(numeroDeHoyReal) }
     var mostrarCalendarioCompleto by remember { mutableStateOf(false) }
+    var showTurnSelectionDialog by remember { mutableStateOf(false) }
+
+    val currentUserId = remember(currentUser) {
+        currentUser?.uid ?: "PADRE_TEST"
+    }
+
+    LaunchedEffect(diaSeleccionado, currentUserId) {
+        routineViewModel.cargarRutinasPorDia(currentUserId, diaSeleccionado)
+    }
 
     val infoMesActual = remember {
         val cal = Calendar.getInstance()
@@ -322,7 +331,7 @@ fun RoutineDashboardScreen(
                         if (esPremium) {
                             onUbicarHijoAccionUnificada()
                         } else {
-                            onNavigateToCreateRoutine(diaSeleccionado)
+                            showTurnSelectionDialog = true
                         }
                     },
                     containerColor = colorDinamicoSuscripcion,
@@ -581,12 +590,77 @@ fun RoutineDashboardScreen(
                             colorSuperficie = colorSuperficieTarjetas,
                             colorTexto = colorTextoPrincipal,
                             colorTextoSec = colorTextoSecundario,
-                            onClick = { onRoutineClick(routine.name) }
+                            onClick = { onRoutineClick(routine.name, diaSeleccionado) }
                         )
                     }
                 }
             }
         }
+    }
+
+    if (showTurnSelectionDialog) {
+        AlertDialog(
+            onDismissRequest = { showTurnSelectionDialog = false },
+            title = {
+                Text(
+                    text = "Seleccionar Turno",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 18.sp,
+                    color = colorTextoPrincipal
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Elige el bloque horario para añadir o editar tu rutina para el día $diaSeleccionado:",
+                        fontSize = 14.sp,
+                        color = colorTextoSecundario
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            showTurnSelectionDialog = false
+                            onNavigateToCreateRoutine("MAÑANA", diaSeleccionado)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFB74D))
+                    ) {
+                        Text("☀️ MAÑANA", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                    Button(
+                        onClick = {
+                            showTurnSelectionDialog = false
+                            onNavigateToCreateRoutine("TARDE", diaSeleccionado)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF81C784))
+                    ) {
+                        Text("⛅ TARDE", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                    Button(
+                        onClick = {
+                            showTurnSelectionDialog = false
+                            onNavigateToCreateRoutine("NOCHE", diaSeleccionado)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9575CD))
+                    ) {
+                        Text("🌙 NOCHE", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showTurnSelectionDialog = false }) {
+                    Text("Cancelar", fontWeight = FontWeight.Bold, color = colorDinamicoSuscripcion)
+                }
+            },
+            containerColor = colorSuperficieTarjetas,
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 }
 
