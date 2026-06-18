@@ -33,10 +33,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.upad.R
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -90,12 +92,14 @@ fun RoutineDashboardScreen(
     val colorDinamicoSuscripcion = if (esPremium) Color(0xFFC5A059) else colorAcabadoPrincipal
 
     // ✅ Corregido aquí también
+    val defaultParentName = stringResource(R.string.parent_tutor)
     var parentName by remember {
         mutableStateOf(
             context.getSharedPreferences("UPAD_PREFS", Context.MODE_PRIVATE)
-                .getString("PARENT_NAME", "PADRE/TUTOR") ?: "PADRE/TUTOR"
+                .getString("PARENT_NAME", "") ?: ""
         )
     }
+    val parentNameToDisplay = parentName.ifEmpty { defaultParentName }
 
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
@@ -113,7 +117,7 @@ fun RoutineDashboardScreen(
         onNavigateToTracking(hijoVinculadoId ?: "DISPOSITIVO_PADRE")
     }
 
-    val childText = "tu hijo"
+    // Localized child text is handled directly in UI string resource
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -138,9 +142,10 @@ fun RoutineDashboardScreen(
         routineViewModel.cargarRutinasPorDia(currentUserId, diaSeleccionado)
     }
 
-    val infoMesActual = remember {
+    val currentLocale = LocalContext.current.resources.configuration.locales[0]
+    val infoMesActual = remember(currentLocale) {
         val cal = Calendar.getInstance()
-        val nombreMes = cal.getDisplayName(Calendar.MONTH, Calendar.LONG, Locale("es", "ES"))?.uppercase() ?: ""
+        val nombreMes = cal.getDisplayName(Calendar.MONTH, Calendar.LONG, currentLocale)?.uppercase() ?: ""
         val anio = cal.get(Calendar.YEAR)
         val maxDias = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
 
@@ -219,8 +224,8 @@ fun RoutineDashboardScreen(
                             modifier = Modifier.size(64.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text(text = parentName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text(text = currentUser?.email ?: "Gestor de Rutinas", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
+                        Text(text = parentNameToDisplay, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(text = currentUser?.email ?: stringResource(R.string.routine_manager), color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -234,7 +239,7 @@ fun RoutineDashboardScreen(
                     icon = { Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700)) },
                     label = {
                         Text(
-                            text = if (esPremium) "Cambiar a Plan Básico" else "Cambiar a Plan Premium",
+                            text = if (esPremium) stringResource(R.string.change_basic_plan) else stringResource(R.string.change_premium_plan),
                             fontWeight = FontWeight.Bold
                         )
                     },
@@ -255,7 +260,7 @@ fun RoutineDashboardScreen(
                 if (esPremium) {
                     NavigationDrawerItem(
                         icon = { Text(text = "📍", fontSize = 20.sp) },
-                        label = { Text(text = "Ubicar a mi Hijo", fontWeight = FontWeight.Bold) },
+                        label = { Text(text = stringResource(R.string.locate_child), fontWeight = FontWeight.Bold) },
                         badge = {
                             Surface(
                                 color = Color(0xFFFFD700),
@@ -276,7 +281,7 @@ fun RoutineDashboardScreen(
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Analytics, contentDescription = null) },
-                    label = { Text("Análisis de Desempeño", fontWeight = FontWeight.Medium) },
+                    label = { Text(stringResource(R.string.performance_analysis), fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onNavigateToAnalytics() },
                     colors = drawerColors,
@@ -285,7 +290,7 @@ fun RoutineDashboardScreen(
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                    label = { Text("Bloquear Dispositivo", fontWeight = FontWeight.Medium) },
+                    label = { Text(stringResource(R.string.lock_device), fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = {
                         scope.launch { drawerState.close() }
@@ -297,7 +302,7 @@ fun RoutineDashboardScreen(
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Link, contentDescription = null) },
-                    label = { Text("Conectar con el Niño (Código)", fontWeight = FontWeight.Medium) },
+                    label = { Text(stringResource(R.string.connect_child), fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onNavigateToConnection() },
                     colors = drawerColors,
@@ -306,7 +311,7 @@ fun RoutineDashboardScreen(
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    label = { Text("Mi Perfil", fontWeight = FontWeight.Medium) },
+                    label = { Text(stringResource(R.string.my_profile), fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onNavigateToProfile() },
                     colors = drawerColors,
@@ -314,7 +319,7 @@ fun RoutineDashboardScreen(
                 )
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                    label = { Text("Ajustes", fontWeight = FontWeight.Medium) },
+                    label = { Text(stringResource(R.string.settings_title), fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onNavigateToSettings() },
                     colors = drawerColors,
@@ -341,7 +346,7 @@ fun RoutineDashboardScreen(
                     if (esPremium) {
                         Text(text = "🗺️", fontSize = 26.sp)
                     } else {
-                        Icon(Icons.Default.Add, contentDescription = "Crear nueva rutina", modifier = Modifier.size(30.dp))
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.create_new_routine), modifier = Modifier.size(30.dp))
                     }
                 }
             }
@@ -365,13 +370,13 @@ fun RoutineDashboardScreen(
                             onClick = { scope.launch { drawerState.open() } },
                             modifier = Modifier.align(Alignment.Start)
                         ) {
-                            Icon(Icons.Default.Menu, contentDescription = "Abrir menú", tint = colorDinamicoSuscripcion, modifier = Modifier.size(28.dp))
+                            Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.open_menu), tint = colorDinamicoSuscripcion, modifier = Modifier.size(28.dp))
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "¡HOLA, $parentName!", fontSize = 14.sp, fontWeight = FontWeight.Black, color = colorTextoSecundario.copy(alpha = 0.6f))
+                        Text(text = stringResource(R.string.hello_parent, parentNameToDisplay), fontSize = 14.sp, fontWeight = FontWeight.Black, color = colorTextoSecundario.copy(alpha = 0.6f))
 
                         Text(
-                            text = if (esPremium) "Rutinas de $childText ⭐" else "Rutinas de $childText",
+                            text = if (esPremium) stringResource(R.string.child_routines) + " ⭐" else stringResource(R.string.child_routines),
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Black,
                             color = colorDinamicoSuscripcion
@@ -390,9 +395,9 @@ fun RoutineDashboardScreen(
                         ) {
                             Text(
                                 text = if (diaSeleccionado == diaDeHoy && diaNumeroSeleccionado == numeroDeHoyReal) {
-                                    "PROGRAMA DE HOY ($diaDeHoy $numeroDeHoyReal)"
+                                    stringResource(R.string.today_program) + " (${getLocalizedDayName(diaDeHoy)} $numeroDeHoyReal)"
                                 } else {
-                                    "PROGRAMA DEL $diaSeleccionado" + if (diaNumeroSeleccionado > 0) " $diaNumeroSeleccionado" else ""
+                                    stringResource(R.string.program_of) + " ${getLocalizedDayName(diaSeleccionado)}" + if (diaNumeroSeleccionado > 0) " $diaNumeroSeleccionado" else ""
                                 },
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Black,
@@ -405,7 +410,7 @@ fun RoutineDashboardScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.CalendarMonth,
-                                    contentDescription = "Planificar otros días",
+                                    contentDescription = stringResource(R.string.monthly_view),
                                     tint = colorDinamicoSuscripcion
                                 )
                             }
@@ -435,7 +440,7 @@ fun RoutineDashboardScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = dia,
+                                        text = getLocalizedDayName(dia),
                                         color = if (esElSeleccionado) {
                                             if (esPremium && !isDarkMode) Color.Black else Color.White
                                         } else if (esHoyReal) {
@@ -477,7 +482,7 @@ fun RoutineDashboardScreen(
                                         letterSpacing = 0.5.sp
                                     )
                                     Text(
-                                        text = "VISTA MENSUAL",
+                                        text = stringResource(R.string.monthly_view),
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = colorTextoSecundario.copy(alpha = 0.6f)
@@ -490,7 +495,12 @@ fun RoutineDashboardScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    val inicialesDias = listOf("D", "L", "M", "M", "J", "V", "S")
+                                    val initialsCal = Calendar.getInstance()
+                                    val inicialesDias = (Calendar.SUNDAY..Calendar.SATURDAY).map { dayOfWeek ->
+                                        initialsCal.set(Calendar.DAY_OF_WEEK, dayOfWeek)
+                                        initialsCal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, currentLocale)
+                                            ?.take(1)?.uppercase(currentLocale) ?: ""
+                                    }
                                     inicialesDias.forEach { letra ->
                                         Text(
                                             text = letra,
@@ -572,10 +582,10 @@ fun RoutineDashboardScreen(
                 item {
                     Text(
                         text = if (diaNumeroSeleccionado > 0) {
-                            "BLOQUES DE ACTIVIDAD - $diaSeleccionado $diaNumeroSeleccionado"
-                        } else {
-                            "BLOQUES DE ACTIVIDAD - $diaSeleccionado"
-                        },
+                                    stringResource(R.string.activity_blocks) + " - ${getLocalizedDayName(diaSeleccionado)} $diaNumeroSeleccionado"
+                                } else {
+                                    stringResource(R.string.activity_blocks) + " - ${getLocalizedDayName(diaSeleccionado)}"
+                                },
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = colorTextoSecundario,
@@ -603,7 +613,7 @@ fun RoutineDashboardScreen(
             onDismissRequest = { showTurnSelectionDialog = false },
             title = {
                 Text(
-                    text = "Seleccionar Turno",
+                    text = stringResource(R.string.select_turn),
                     fontWeight = FontWeight.Black,
                     fontSize = 18.sp,
                     color = colorTextoPrincipal
@@ -612,7 +622,7 @@ fun RoutineDashboardScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Elige el bloque horario para añadir o editar tu rutina para el día $diaSeleccionado:",
+                        text = stringResource(R.string.choose_time_block, getLocalizedDayName(diaSeleccionado)),
                         fontSize = 14.sp,
                         color = colorTextoSecundario
                     )
@@ -626,7 +636,7 @@ fun RoutineDashboardScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFB74D))
                     ) {
-                        Text("☀️ MAÑANA", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("☀️ " + stringResource(R.string.morning), fontWeight = FontWeight.Bold, color = Color.White)
                     }
                     Button(
                         onClick = {
@@ -637,7 +647,7 @@ fun RoutineDashboardScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF81C784))
                     ) {
-                        Text("⛅ TARDE", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("⛅ " + stringResource(R.string.afternoon), fontWeight = FontWeight.Bold, color = Color.White)
                     }
                     Button(
                         onClick = {
@@ -648,14 +658,14 @@ fun RoutineDashboardScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9575CD))
                     ) {
-                        Text("🌙 NOCHE", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("🌙 " + stringResource(R.string.evening), fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             },
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showTurnSelectionDialog = false }) {
-                    Text("Cancelar", fontWeight = FontWeight.Bold, color = colorDinamicoSuscripcion)
+                    Text(stringResource(R.string.cancel), fontWeight = FontWeight.Bold, color = colorDinamicoSuscripcion)
                 }
             },
             containerColor = colorSuperficieTarjetas,
@@ -708,13 +718,13 @@ fun RoutineProgressCard(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
-                            text = routine.name,
+                            text = getLocalizedTurnName(routine.name),
                             color = colorTexto,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Black
                         )
                         Text(
-                            text = "${routine.completedTasks}/${routine.totalTasks} tareas logradas",
+                            text = stringResource(R.string.tasks_completed, routine.completedTasks, routine.totalTasks),
                             color = colorTextoSec.copy(alpha = 0.7f),
                             fontSize = 12.sp
                         )
@@ -742,4 +752,37 @@ fun RoutineProgressCard(
             )
         }
     }
+}
+
+@Composable
+fun getLocalizedDayName(day: String): String {
+    val cleanDay = day.uppercase()
+        .replace("Á", "A")
+        .replace("É", "E")
+        .replace("Í", "I")
+        .replace("Ó", "O")
+        .replace("Ú", "U")
+        .trim()
+    val resId = when (cleanDay) {
+        "LUNES" -> R.string.monday
+        "MARTES" -> R.string.tuesday
+        "MIERCOLES" -> R.string.wednesday
+        "JUEVES" -> R.string.thursday
+        "VIERNES" -> R.string.friday
+        "SABADO" -> R.string.saturday
+        "DOMINGO" -> R.string.sunday
+        else -> return day
+    }
+    return stringResource(resId)
+}
+
+@Composable
+fun getLocalizedTurnName(turn: String): String {
+    val resId = when (turn.uppercase()) {
+        "MAÑANA" -> R.string.morning
+        "TARDE" -> R.string.afternoon
+        "NOCHE" -> R.string.evening
+        else -> return turn
+    }
+    return stringResource(resId)
 }
